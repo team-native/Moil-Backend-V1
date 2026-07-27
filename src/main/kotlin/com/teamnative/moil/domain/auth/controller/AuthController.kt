@@ -4,6 +4,8 @@ import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
 import com.teamnative.moil.domain.auth.dto.ChangePasswordRequest
 import com.teamnative.moil.domain.auth.dto.ConfirmSignupRequest
 import com.teamnative.moil.domain.auth.dto.LoginRequest
+import com.teamnative.moil.domain.auth.dto.RefreshTokenRequest
+import com.teamnative.moil.domain.auth.dto.RefreshTokenResponse
 import com.teamnative.moil.domain.auth.dto.ResetPasswordRequest
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeRequest
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeResponse
@@ -15,6 +17,7 @@ import com.teamnative.moil.domain.auth.service.ChangePasswordService
 import com.teamnative.moil.domain.auth.service.LoginService
 import com.teamnative.moil.domain.auth.service.PasswordResetService
 import com.teamnative.moil.domain.auth.service.SignupService
+import com.teamnative.moil.domain.auth.service.TokenRefreshService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.GetMapping
@@ -33,6 +36,7 @@ class AuthController(
     private val passwordResetService: PasswordResetService,
     private val authenticatedUserService: AuthenticatedUserService,
     private val changePasswordService: ChangePasswordService,
+    private val tokenRefreshService: TokenRefreshService,
 ) {
 
     @GetMapping
@@ -102,4 +106,14 @@ class AuthController(
 
         return ApiResponse.empty("로그아웃되었습니다.")
     }
+
+    @PostMapping("/refresh")
+    fun refresh(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @Valid @RequestBody request: RefreshTokenRequest,
+    ): ApiResponse<RefreshTokenResponse> =
+        ApiResponse.success(
+            message = "토큰이 재발급되었습니다.",
+            data = tokenRefreshService.refresh(authorization, request.refreshToken),
+        )
 }

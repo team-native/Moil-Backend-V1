@@ -191,11 +191,11 @@ class SecurityConfigTest {
 
     @Test
     fun `change password validates origin password`() {
-        val accessToken = createLoginSession(password = "old-password")
+        val session = createLoginSession(password = "old-password")
 
         mockMvc.perform(
             post("/auth/change-password")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"origin":"wrong-password","newpwd":"new-password","checkpwd":"new-password"}"""),
         )
@@ -208,11 +208,11 @@ class SecurityConfigTest {
 
     @Test
     fun `change password validates new password confirmation`() {
-        val accessToken = createLoginSession(password = "old-password")
+        val session = createLoginSession(password = "old-password")
 
         mockMvc.perform(
             post("/auth/change-password")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"origin":"old-password","newpwd":"new-password","checkpwd":"other-password"}"""),
         )
@@ -235,11 +235,11 @@ class SecurityConfigTest {
 
     @Test
     fun `logout removes current login session`() {
-        val accessToken = createLoginSession(password = "password")
+        val session = createLoginSession(password = "password")
 
         mockMvc.perform(
             post("/auth/logout")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
@@ -249,13 +249,73 @@ class SecurityConfigTest {
 
         mockMvc.perform(
             post("/auth/logout")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
         )
             .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
     }
 
-    private fun createLoginSession(password: String): String {
+    @Test
+    fun `refresh token requires login session`() {
+        mockMvc.perform(
+            post("/auth/refresh")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"refresh_token":"refresh_unknown"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `refresh token validates refresh token`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/refresh")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"refresh_token":"wrong_refresh"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("리프레시 토큰이 유효하지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `refresh token replaces login session tokens`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/refresh")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"refresh_token":"${session.refreshToken}"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("토큰이 재발급되었습니다."))
+            .andExpect(jsonPath("$.data.accessToken").exists())
+            .andExpect(jsonPath("$.data.refreshToken").exists())
+            .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+            .andExpect(jsonPath("$.data.expiresIn").value(3600))
+
+        mockMvc.perform(
+            post("/auth/refresh")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"refresh_token":"${session.refreshToken}"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+    }
+
+    private fun createLoginSession(password: String): TestLoginSession {
         val id = UUID.randomUUID()
         val passwordHash = passwordEncoder.encode(password) ?: error("Password encoding failed.")
         val user = userAccountRepository.save(
@@ -266,16 +326,25 @@ class SecurityConfigTest {
             ),
         )
         val accessToken = "access_$id"
+        val refreshToken = "refresh_$id"
 
         loginSessionRepository.save(
             LoginSession(
                 accessToken = accessToken,
                 userId = user.id,
-                refreshToken = "refresh_$id",
+                refreshToken = refreshToken,
                 expiresAt = Instant.now().plusSeconds(3600),
             ),
         )
 
-        return accessToken
+        return TestLoginSession(
+            accessToken = accessToken,
+            refreshToken = refreshToken,
+        )
     }
+
+    private data class TestLoginSession(
+        val accessToken: String,
+        val refreshToken: String,
+    )
 }
