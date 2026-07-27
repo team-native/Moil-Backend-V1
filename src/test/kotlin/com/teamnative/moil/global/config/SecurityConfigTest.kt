@@ -304,6 +304,46 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `create group event validates content length`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/events/groups/1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title":"${"가".repeat(101)}",
+                      "startsAt":"2026-01-10T10:00:00Z",
+                      "endsAt":"2026-01-10T11:00:00Z"
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.message").value("일정 제목은 100자 이하로 입력해주세요."))
+
+        mockMvc.perform(
+            post("/events/groups/1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title":"회의",
+                      "memo":"${"가".repeat(1001)}",
+                      "startsAt":"2026-01-10T10:00:00Z",
+                      "endsAt":"2026-01-10T11:00:00Z"
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.message").value("일정 메모는 1000자 이하로 입력해주세요."))
+    }
+
+    @Test
     fun `create group event returns not found group`() {
         val session = createLoginSession(password = "password")
 
@@ -601,6 +641,46 @@ class SecurityConfigTest {
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.message").value("종료 시간을 입력해주세요."))
+    }
+
+    @Test
+    fun `update group event validates content length`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            put("/events/groups/1/1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title":"${"가".repeat(101)}",
+                      "startsAt":"2026-01-10T12:00:00Z",
+                      "endsAt":"2026-01-10T13:00:00Z"
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.message").value("일정 제목은 100자 이하로 입력해주세요."))
+
+        mockMvc.perform(
+            put("/events/groups/1/1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title":"수정 회의",
+                      "memo":"${"가".repeat(1001)}",
+                      "startsAt":"2026-01-10T12:00:00Z",
+                      "endsAt":"2026-01-10T13:00:00Z"
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.message").value("일정 메모는 1000자 이하로 입력해주세요."))
     }
 
     @Test
