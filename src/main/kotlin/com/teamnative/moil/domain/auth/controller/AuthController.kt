@@ -3,6 +3,7 @@ package com.teamnative.moil.domain.auth.controller
 import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
 import com.teamnative.moil.domain.auth.dto.ChangePasswordRequest
 import com.teamnative.moil.domain.auth.dto.ConfirmSignupRequest
+import com.teamnative.moil.domain.auth.dto.DeleteAccountRequest
 import com.teamnative.moil.domain.auth.dto.LoginRequest
 import com.teamnative.moil.domain.auth.dto.RefreshTokenRequest
 import com.teamnative.moil.domain.auth.dto.RefreshTokenResponse
@@ -14,6 +15,7 @@ import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeResponse
 import com.teamnative.moil.domain.auth.service.EmailVerificationService
 import com.teamnative.moil.domain.auth.service.AuthenticatedUserService
 import com.teamnative.moil.domain.auth.service.ChangePasswordService
+import com.teamnative.moil.domain.auth.service.DeleteAccountService
 import com.teamnative.moil.domain.auth.service.LoginService
 import com.teamnative.moil.domain.auth.service.PasswordResetService
 import com.teamnative.moil.domain.auth.service.SignupService
@@ -37,6 +39,7 @@ class AuthController(
     private val authenticatedUserService: AuthenticatedUserService,
     private val changePasswordService: ChangePasswordService,
     private val tokenRefreshService: TokenRefreshService,
+    private val deleteAccountService: DeleteAccountService,
 ) {
 
     @GetMapping
@@ -116,4 +119,15 @@ class AuthController(
             message = "토큰이 재발급되었습니다.",
             data = tokenRefreshService.refresh(authorization, request.refreshToken),
         )
+
+    @PostMapping("/delete-account")
+    fun deleteAccount(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @Valid @RequestBody request: DeleteAccountRequest,
+    ): ApiResponse<Nothing> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+        deleteAccountService.delete(user, request.email, request.password, request.leftData!!)
+
+        return ApiResponse.empty("회원 탈퇴가 완료되었습니다.")
+    }
 }

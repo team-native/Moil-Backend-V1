@@ -315,13 +315,69 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
     }
 
+    @Test
+    fun `delete account requires login session`() {
+        mockMvc.perform(
+            post("/auth/delete-account")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"user@example.com","password":"password","leftData":true}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `delete account validates account credentials`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/delete-account")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"${session.email}","password":"wrong-password","leftData":true}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 일치하지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `delete account removes user and login sessions`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/delete-account")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"${session.email}","password":"password","leftData":false}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("회원 탈퇴가 완료되었습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+
+        mockMvc.perform(
+            post("/auth/logout")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+    }
+
     private fun createLoginSession(password: String): TestLoginSession {
         val id = UUID.randomUUID()
+        val email = "test-$id@example.com"
         val passwordHash = passwordEncoder.encode(password) ?: error("Password encoding failed.")
         val user = userAccountRepository.save(
             UserAccount(
                 name = "test-user",
-                email = "test-$id@example.com",
+                email = email,
                 passwordHash = passwordHash,
             ),
         )
@@ -340,11 +396,13 @@ class SecurityConfigTest {
         return TestLoginSession(
             accessToken = accessToken,
             refreshToken = refreshToken,
+            email = email,
         )
     }
 
     private data class TestLoginSession(
         val accessToken: String,
         val refreshToken: String,
+        val email: String,
     )
 }
