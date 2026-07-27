@@ -76,7 +76,7 @@ class GroupManagementService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 그룹 관리자입니다.")
         }
 
-        val previousOwner = groupMemberRepository.save(
+        val previousOwner = groupMemberRepository.saveAndFlush(
             access.member.copy(
                 role = GroupRole.ADMIN,
                 ownerGroupId = null,
