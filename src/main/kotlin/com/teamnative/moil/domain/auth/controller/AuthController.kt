@@ -1,6 +1,7 @@
 package com.teamnative.moil.domain.auth.controller
 
 import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
+import com.teamnative.moil.domain.auth.dto.ChangePasswordRequest
 import com.teamnative.moil.domain.auth.dto.ConfirmSignupRequest
 import com.teamnative.moil.domain.auth.dto.LoginRequest
 import com.teamnative.moil.domain.auth.dto.ResetPasswordRequest
@@ -9,12 +10,15 @@ import com.teamnative.moil.domain.auth.dto.SendEmailCodeResponse
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeRequest
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeResponse
 import com.teamnative.moil.domain.auth.service.EmailVerificationService
+import com.teamnative.moil.domain.auth.service.AuthenticatedUserService
+import com.teamnative.moil.domain.auth.service.ChangePasswordService
 import com.teamnative.moil.domain.auth.service.LoginService
 import com.teamnative.moil.domain.auth.service.PasswordResetService
 import com.teamnative.moil.domain.auth.service.SignupService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
@@ -27,6 +31,8 @@ class AuthController(
     private val signupService: SignupService,
     private val loginService: LoginService,
     private val passwordResetService: PasswordResetService,
+    private val authenticatedUserService: AuthenticatedUserService,
+    private val changePasswordService: ChangePasswordService,
 ) {
 
     @GetMapping
@@ -73,6 +79,17 @@ class AuthController(
         @Valid @RequestBody request: ResetPasswordRequest,
     ): ApiResponse<Nothing> {
         passwordResetService.reset(request.sessionId, request.password, request.pwd)
+
+        return ApiResponse.empty("비밀번호가 변경되었습니다.")
+    }
+
+    @PostMapping("/change-password")
+    fun changePassword(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @Valid @RequestBody request: ChangePasswordRequest,
+    ): ApiResponse<Nothing> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+        changePasswordService.change(user, request.origin, request.newpwd, request.checkpwd)
 
         return ApiResponse.empty("비밀번호가 변경되었습니다.")
     }

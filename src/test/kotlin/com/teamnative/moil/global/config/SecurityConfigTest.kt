@@ -1,15 +1,23 @@
 package com.teamnative.moil.global.config
 
+import com.teamnative.moil.domain.auth.model.LoginSession
+import com.teamnative.moil.domain.auth.model.UserAccount
+import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
+import com.teamnative.moil.domain.auth.repository.UserAccountRepository
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.security.crypto.password.PasswordEncoder
+import org.springframework.http.HttpHeaders
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.http.MediaType
+import java.time.Instant
+import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -17,6 +25,15 @@ class SecurityConfigTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
+
+    @Autowired
+    private lateinit var userAccountRepository: UserAccountRepository
+
+    @Autowired
+    private lateinit var loginSessionRepository: LoginSessionRepository
+
+    @Autowired
+    private lateinit var passwordEncoder: PasswordEncoder
 
     @Test
     fun `health endpoint is permitted`() {
@@ -156,5 +173,77 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.status").value(404))
             .andExpect(jsonPath("$.message").value("비밀번호 초기화 세션이 없거나 만료되었습니다."))
             .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `change password requires login session`() {
+        mockMvc.perform(
+            post("/auth/change-password")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"origin":"old-password","newpwd":"new-password","checkpwd":"new-password"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `change password validates origin password`() {
+        val accessToken = createLoginSession(password = "old-password")
+
+        mockMvc.perform(
+            post("/auth/change-password")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"origin":"wrong-password","newpwd":"new-password","checkpwd":"new-password"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("기존 비밀번호가 일치하지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `change password validates new password confirmation`() {
+        val accessToken = createLoginSession(password = "old-password")
+
+        mockMvc.perform(
+            post("/auth/change-password")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"origin":"old-password","newpwd":"new-password","checkpwd":"other-password"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("새 비밀번호가 일치하지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    private fun createLoginSession(password: String): String {
+        val id = UUID.randomUUID()
+        val passwordHash = passwordEncoder.encode(password) ?: error("Password encoding failed.")
+        val user = userAccountRepository.save(
+            UserAccount(
+                name = "test-user",
+                email = "test-$id@example.com",
+                passwordHash = passwordHash,
+            ),
+        )
+        val accessToken = "access_$id"
+
+        loginSessionRepository.save(
+            LoginSession(
+                accessToken = accessToken,
+                userId = user.id,
+                refreshToken = "refresh_$id",
+                expiresAt = Instant.now().plusSeconds(3600),
+            ),
+        )
+
+        return accessToken
     }
 }
