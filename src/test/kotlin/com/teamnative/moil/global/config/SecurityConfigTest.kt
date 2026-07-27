@@ -223,6 +223,38 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.data").doesNotExist())
     }
 
+    @Test
+    fun `logout requires login session`() {
+        mockMvc.perform(post("/auth/logout"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `logout removes current login session`() {
+        val accessToken = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/logout")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("로그아웃되었습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+
+        mockMvc.perform(
+            post("/auth/logout")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+    }
+
     private fun createLoginSession(password: String): String {
         val id = UUID.randomUUID()
         val passwordHash = passwordEncoder.encode(password) ?: error("Password encoding failed.")

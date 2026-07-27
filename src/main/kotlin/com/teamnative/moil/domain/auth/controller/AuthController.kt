@@ -93,4 +93,13 @@ class AuthController(
 
         return ApiResponse.empty("비밀번호가 변경되었습니다.")
     }
+
+    @PostMapping("/logout")
+    fun logout(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+    ): ApiResponse<Nothing> {
+        authenticatedUserService.logout(authorization)
+
+        return ApiResponse.empty("로그아웃되었습니다.")
+    }
 }
