@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: moil-backend-v1
+
+server:
+  port: 6500
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+logging:
+  level:
+    org.springframework.security: INFO
