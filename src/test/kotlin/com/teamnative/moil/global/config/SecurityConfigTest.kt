@@ -48,11 +48,20 @@ class SecurityConfigTest {
     fun `nested api endpoints are not available yet`() {
         mockMvc.perform(post("/auth/login"))
             .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.data").doesNotExist())
 
         mockMvc.perform(get("/groups/me"))
             .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.data").doesNotExist())
 
         mockMvc.perform(get("/events/1"))
             .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.data").doesNotExist())
     }
 }
