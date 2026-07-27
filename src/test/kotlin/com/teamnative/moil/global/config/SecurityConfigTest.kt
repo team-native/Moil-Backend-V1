@@ -47,12 +47,6 @@ class SecurityConfigTest {
 
     @Test
     fun `nested api endpoints are not available yet`() {
-        mockMvc.perform(post("/auth/login"))
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.data").doesNotExist())
-
         mockMvc.perform(get("/groups/me"))
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.success").value(false))
@@ -119,6 +113,20 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.status").value(404))
             .andExpect(jsonPath("$.message").value("회원가입 세션이 없거나 만료되었습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `login rejects invalid credentials`() {
+        mockMvc.perform(
+            post("/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"unknown@example.com","password":"password"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 일치하지 않습니다."))
             .andExpect(jsonPath("$.data").doesNotExist())
     }
 }
