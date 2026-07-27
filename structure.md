@@ -13,7 +13,9 @@ src/main/kotlin/com/teamnative/moil
 │   ├── event
 │   │   └── controller
 │   ├── group
-│   │   └── controller
+│   │   ├── controller
+│   │   ├── model
+│   │   └── repository
 │   └── health
 │       └── controller
 └── global
