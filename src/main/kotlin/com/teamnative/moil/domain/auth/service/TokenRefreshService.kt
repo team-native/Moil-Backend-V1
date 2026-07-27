@@ -26,17 +26,22 @@ class TokenRefreshService(
     @Transactional
     fun refresh(authorization: String?, refreshToken: String): RefreshTokenResponse {
         val accessToken = authorization.extractBearerToken()
-        val claims = accessToken.validateJwt()
+        val claims = accessToken.validateJwtAllowExpired()
         val session = loginSessionRepository.findByAccessToken(accessToken)
             ?: throw unauthorized()
 
-        if (session.expiresAt.isBefore(Instant.now(clock))) {
-            loginSessionRepository.delete(session)
-            throw unauthorized()
-        }
-
         if (session.refreshToken != refreshToken) {
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 유효하지 않습니다.")
+        }
+
+        val now = Instant.now(clock)
+        if (!session.expiresAt.isBefore(now)) {
+            return RefreshTokenResponse(
+                accessToken = session.accessToken,
+                refreshToken = session.refreshToken,
+                tokenType = "Bearer",
+                expiresIn = jwtProperties.accessTokenExpiresIn,
+            )
         }
 
         val user = userAccountRepository.findById(claims.userId).orElse(null)
@@ -51,7 +56,7 @@ class TokenRefreshService(
                 accessToken = newAccessToken,
                 userId = session.userId,
                 refreshToken = newRefreshToken,
-                expiresAt = Instant.now(clock).plusSeconds(jwtProperties.accessTokenExpiresIn),
+                expiresAt = now.plusSeconds(jwtProperties.accessTokenExpiresIn),
             ),
         )
 
@@ -71,9 +76,9 @@ class TokenRefreshService(
             ?.takeIf { it.isNotBlank() }
             ?: throw unauthorized()
 
-    private fun String.validateJwt(): JwtProvider.JwtClaims =
+    private fun String.validateJwtAllowExpired(): JwtProvider.JwtClaims =
         try {
-            jwtProvider.validate(this)
+            jwtProvider.validateAllowExpired(this)
         } catch (exception: Exception) {
             throw unauthorized()
         }

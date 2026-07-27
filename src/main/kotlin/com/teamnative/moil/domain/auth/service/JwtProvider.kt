@@ -3,6 +3,7 @@ package com.teamnative.moil.domain.auth.service
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.global.config.JwtProperties
 import io.jsonwebtoken.Claims
+import io.jsonwebtoken.ExpiredJwtException
 import io.jsonwebtoken.Jwts
 import io.jsonwebtoken.security.Keys
 import org.springframework.stereotype.Component
@@ -21,8 +22,7 @@ class JwtProvider(
         jwtProperties.secret.toByteArray(StandardCharsets.UTF_8),
     )
 
-    fun generateAccessToken(user: UserAccount): String {
-        val issuedAt = Instant.now(clock)
+    fun generateAccessToken(user: UserAccount, issuedAt: Instant = Instant.now(clock)): String {
         val expiresAt = issuedAt.plusSeconds(jwtProperties.accessTokenExpiresIn)
 
         return Jwts.builder()
@@ -45,12 +45,28 @@ class JwtProvider(
             )
         }
 
+    fun validateAllowExpired(accessToken: String): JwtClaims =
+        parseClaimsAllowExpired(accessToken).let { claims ->
+            JwtClaims(
+                userId = claims.subject.toLong(),
+                email = claims["email", String::class.java],
+                name = claims["name", String::class.java],
+            )
+        }
+
     private fun parseClaims(accessToken: String): Claims =
         Jwts.parser()
             .verifyWith(signingKey)
             .build()
             .parseSignedClaims(accessToken)
             .payload
+
+    private fun parseClaimsAllowExpired(accessToken: String): Claims =
+        try {
+            parseClaims(accessToken)
+        } catch (exception: ExpiredJwtException) {
+            exception.claims
+        }
 
     data class JwtClaims(
         val userId: Long,

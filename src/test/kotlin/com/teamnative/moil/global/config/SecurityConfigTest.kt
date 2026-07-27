@@ -295,8 +295,38 @@ class SecurityConfigTest {
     }
 
     @Test
-    fun `refresh token replaces login session tokens`() {
+    fun `refresh token returns same access token before expiration`() {
         val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/refresh")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"refresh_token":"${session.refreshToken}"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("토큰이 재발급되었습니다."))
+            .andExpect(jsonPath("$.data.accessToken").value(session.accessToken))
+            .andExpect(jsonPath("$.data.refreshToken").value(session.refreshToken))
+            .andExpect(jsonPath("$.data.tokenType").value("Bearer"))
+            .andExpect(jsonPath("$.data.expiresIn").value(3600))
+
+        mockMvc.perform(
+            post("/auth/refresh")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"refresh_token":"${session.refreshToken}"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.accessToken").value(session.accessToken))
+            .andExpect(jsonPath("$.data.refreshToken").value(session.refreshToken))
+    }
+
+    @Test
+    fun `refresh token replaces expired access token once`() {
+        val session = createLoginSession(password = "password", expired = true)
 
         mockMvc.perform(
             post("/auth/refresh")
@@ -378,7 +408,7 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
     }
 
-    private fun createLoginSession(password: String): TestLoginSession {
+    private fun createLoginSession(password: String, expired: Boolean = false): TestLoginSession {
         val id = UUID.randomUUID()
         val email = "test-$id@example.com"
         val passwordHash = passwordEncoder.encode(password) ?: error("Password encoding failed.")
@@ -389,7 +419,12 @@ class SecurityConfigTest {
                 passwordHash = passwordHash,
             ),
         )
-        val accessToken = jwtProvider.generateAccessToken(user)
+        val issuedAt = if (expired) {
+            Instant.now().minusSeconds(jwtProperties.accessTokenExpiresIn + 1)
+        } else {
+            Instant.now()
+        }
+        val accessToken = jwtProvider.generateAccessToken(user, issuedAt)
         val refreshToken = "refresh_$id"
 
         loginSessionRepository.save(
@@ -398,7 +433,7 @@ class SecurityConfigTest {
                 accessToken = accessToken,
                 userId = user.id,
                 refreshToken = refreshToken,
-                expiresAt = Instant.now().plusSeconds(jwtProperties.accessTokenExpiresIn),
+                expiresAt = issuedAt.plusSeconds(jwtProperties.accessTokenExpiresIn),
             ),
         )
 
