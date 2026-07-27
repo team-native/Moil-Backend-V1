@@ -5,6 +5,7 @@ import com.teamnative.moil.domain.group.dto.CheckGroupInviteRequest
 import com.teamnative.moil.domain.group.dto.CheckGroupInviteResponse
 import com.teamnative.moil.domain.group.dto.CreateGroupRequest
 import com.teamnative.moil.domain.group.dto.CreateGroupResponse
+import com.teamnative.moil.domain.group.dto.GroupDetailResponse
 import com.teamnative.moil.domain.group.dto.GroupSummaryResponse
 import com.teamnative.moil.domain.group.dto.JoinGroupRequest
 import com.teamnative.moil.domain.group.dto.JoinGroupResponse
@@ -14,6 +15,7 @@ import com.teamnative.moil.domain.group.service.GroupQueryService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
@@ -38,6 +40,19 @@ class GroupController(
         return ApiResponse.success(
             message = "내 그룹 목록을 조회했습니다.",
             data = groupQueryService.findMyGroups(user),
+        )
+    }
+
+    @GetMapping("/{groupId:[0-9]+}")
+    fun group(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+    ): ApiResponse<GroupDetailResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "그룹 정보를 조회했습니다.",
+            data = groupQueryService.findGroup(user, groupId),
         )
     }
 

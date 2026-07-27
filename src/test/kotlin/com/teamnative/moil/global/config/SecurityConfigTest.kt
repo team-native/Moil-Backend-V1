@@ -132,6 +132,86 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `group detail requires login session`() {
+        mockMvc.perform(get("/groups/1"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `group detail returns not found`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            get("/groups/999999")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `group detail rejects non member`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+
+        mockMvc.perform(
+            get("/groups/${group.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(403))
+            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `group detail returns group information`() {
+        val session = createLoginSession(password = "password")
+        val otherSession = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.saveAll(
+            listOf(
+                GroupMember(
+                    groupId = group.id,
+                    userId = session.userId,
+                    role = GroupRole.ADMIN,
+                    notificationEnabled = false,
+                    joinedAt = Instant.now(),
+                ),
+                GroupMember(
+                    groupId = group.id,
+                    userId = otherSession.userId,
+                    role = GroupRole.MEMBER,
+                    joinedAt = Instant.now(),
+                ),
+            ),
+        )
+
+        mockMvc.perform(
+            get("/groups/${group.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("그룹 정보를 조회했습니다."))
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.name").value("스터디 그룹"))
+            .andExpect(jsonPath("$.data.inviteCode").value(group.inviteCode))
+            .andExpect(jsonPath("$.data.role").value("ADMIN"))
+            .andExpect(jsonPath("$.data.memberCount").value(2))
+            .andExpect(jsonPath("$.data.notificationEnabled").value(false))
+    }
+
+    @Test
     fun `create group requires login session`() {
         mockMvc.perform(
             post("/groups")

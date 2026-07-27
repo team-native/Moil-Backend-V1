@@ -1,6 +1,7 @@
 package com.teamnative.moil.domain.group.service
 
 import com.teamnative.moil.domain.auth.model.UserAccount
+import com.teamnative.moil.domain.group.dto.GroupDetailResponse
 import com.teamnative.moil.domain.group.dto.GroupSummaryResponse
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional
 class GroupQueryService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val groupPermissionService: GroupPermissionService,
 ) {
 
     @Transactional(readOnly = true)
@@ -30,5 +32,19 @@ class GroupQueryService(
                 notificationEnabled = member.notificationEnabled,
             )
         }
+    }
+
+    @Transactional(readOnly = true)
+    fun findGroup(user: UserAccount, groupId: Long): GroupDetailResponse {
+        val access = groupPermissionService.requireMember(user, groupId)
+
+        return GroupDetailResponse(
+            groupId = access.group.id,
+            name = access.group.name,
+            inviteCode = access.group.inviteCode,
+            role = access.member.role,
+            memberCount = groupMemberRepository.countByGroupId(access.group.id),
+            notificationEnabled = access.member.notificationEnabled,
+        )
     }
 }
