@@ -56,6 +56,41 @@ class EventCommandService(
         return event.toDetailResponse()
     }
 
+    @Transactional
+    fun update(
+        user: UserAccount,
+        groupId: Long,
+        eventId: Long,
+        title: String,
+        memo: String?,
+        startsAt: String,
+        endsAt: String,
+    ): EventDetailResponse {
+        groupPermissionService.requireMember(user, groupId)
+
+        val event = eventRepository.findByIdAndGroupId(eventId, groupId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다.")
+        val startsAtInstant = startsAt.toInstant()
+        val endsAtInstant = endsAt.toInstant()
+
+        if (!startsAtInstant.isBefore(endsAtInstant)) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "일정 시간 범위가 올바르지 않습니다.")
+        }
+
+        val updatedEvent = eventRepository.save(
+            event.copy(
+                updaterId = user.id,
+                title = title,
+                memo = memo,
+                startsAt = startsAtInstant,
+                endsAt = endsAtInstant,
+                updatedAt = Instant.now(clock),
+            ),
+        )
+
+        return updatedEvent.toDetailResponse()
+    }
+
     private fun String.toInstant(): Instant =
         try {
             Instant.parse(this)

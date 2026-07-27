@@ -4,6 +4,7 @@ import com.teamnative.moil.domain.auth.service.AuthenticatedUserService
 import com.teamnative.moil.domain.event.dto.CreateEventRequest
 import com.teamnative.moil.domain.event.dto.EventCalendarResponse
 import com.teamnative.moil.domain.event.dto.EventDetailResponse
+import com.teamnative.moil.domain.event.dto.UpdateEventRequest
 import com.teamnative.moil.domain.event.service.EventCommandService
 import com.teamnative.moil.domain.event.service.EventQueryService
 import com.teamnative.moil.global.dto.ApiResponse
@@ -11,6 +12,7 @@ import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.RequestParam
@@ -75,6 +77,29 @@ class EventController(
         return ApiResponse.success(
             message = "그룹 일정을 조회했습니다.",
             data = eventQueryService.findGroupEvent(user, groupId, eventId),
+        )
+    }
+
+    @PutMapping("/groups/{groupId:[0-9]+}/{eventId:[0-9]+}")
+    fun updateGroupEvent(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+        @PathVariable eventId: Long,
+        @Valid @RequestBody request: UpdateEventRequest,
+    ): ApiResponse<EventDetailResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "그룹 일정이 수정되었습니다.",
+            data = eventCommandService.update(
+                user = user,
+                groupId = groupId,
+                eventId = eventId,
+                title = request.title,
+                memo = request.memo,
+                startsAt = request.startsAt,
+                endsAt = request.endsAt,
+            ),
         )
     }
 }

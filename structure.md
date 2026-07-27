@@ -48,7 +48,8 @@ src
 │   │   │   │   ├── dto
 │   │   │   │   │   ├── CreateEventRequest.kt
 │   │   │   │   │   ├── EventCalendarResponse.kt
-│   │   │   │   │   └── EventDetailResponse.kt
+│   │   │   │   │   ├── EventDetailResponse.kt
+│   │   │   │   │   └── UpdateEventRequest.kt
 │   │   │   │   ├── model/Event.kt
 │   │   │   │   ├── repository/EventRepository.kt
 │   │   │   │   └── service
