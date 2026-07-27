@@ -26,7 +26,9 @@ class SecurityConfig {
                         "/",
                         "/health",
                         "/actuator/health",
-                        "/api/v1/auth/**",
+                        "/auth/**",
+                        "/groups/**",
+                        "/events/**",
                     ).permitAll()
                     .anyRequest().authenticated()
             }

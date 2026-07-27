@@ -2,6 +2,7 @@ package com.teamnative.moil.global.exception
 
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.web.servlet.resource.NoResourceFoundException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -20,6 +21,12 @@ class GlobalExceptionHandler {
             .status(HttpStatus.BAD_REQUEST)
             .body(ErrorResponse(code = "VALIDATION_ERROR", message = message))
     }
+
+    @ExceptionHandler(NoResourceFoundException::class)
+    fun handleNoResourceFoundException(exception: NoResourceFoundException): ResponseEntity<ErrorResponse> =
+        ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(ErrorResponse(code = "NOT_FOUND", message = "Resource not found."))
 
     @ExceptionHandler(Exception::class)
     fun handleException(exception: Exception): ResponseEntity<ErrorResponse> =

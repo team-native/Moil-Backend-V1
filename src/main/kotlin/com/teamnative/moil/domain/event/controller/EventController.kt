@@ -1,4 +1,4 @@
-package com.teamnative.moil.domain.auth.controller
+package com.teamnative.moil.domain.event.controller
 
 import com.teamnative.moil.global.dto.ApiResponse
 import org.springframework.web.bind.annotation.GetMapping
@@ -6,9 +6,9 @@ import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 
 @RestController
-@RequestMapping("/auth")
-class AuthController {
+@RequestMapping("/events")
+class EventController {
 
     @GetMapping
-    fun auth(): ApiResponse<Nothing> = ApiResponse.empty("/auth")
+    fun events(): ApiResponse<Nothing> = ApiResponse.empty("/events")
 }

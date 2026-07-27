@@ -14,18 +14,7 @@
 
 ## 프로젝트 구조
 
-```text
-src/main/kotlin/com/teamnative/moil
-├── Application.kt
-├── domain
-│   ├── auth
-│   │   ├── controller
-│   │   └── dto
-│   └── health
-└── global
-    ├── config
-    └── exception
-```
+[구조 확인](structure.md)
 
 ## 실행
 
@@ -57,9 +46,11 @@ Windows PowerShell:
 
 - `GET /health`
 
-## 인증 API
+## API 루트
 
-- `POST /api/v1/auth/login`
+- `GET /auth`
+- `GET /groups`
+- `GET /events`
 
 ## 템플릿 유지보수
 
