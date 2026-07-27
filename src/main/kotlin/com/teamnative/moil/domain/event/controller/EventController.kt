@@ -63,4 +63,18 @@ class EventController(
             ),
         )
     }
+
+    @GetMapping("/groups/{groupId:[0-9]+}/{eventId:[0-9]+}")
+    fun groupEvent(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+        @PathVariable eventId: Long,
+    ): ApiResponse<EventDetailResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "그룹 일정을 조회했습니다.",
+            data = eventQueryService.findGroupEvent(user, groupId, eventId),
+        )
+    }
 }
