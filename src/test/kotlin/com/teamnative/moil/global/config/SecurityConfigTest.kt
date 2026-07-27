@@ -132,6 +132,63 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `create group requires login session`() {
+        mockMvc.perform(
+            post("/groups")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"스터디 그룹"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `create group validates name`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":""}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("그룹 이름을 입력해주세요."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `create group registers owner member`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"스터디 그룹"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("그룹이 생성되었습니다."))
+            .andExpect(jsonPath("$.data.groupId").exists())
+            .andExpect(jsonPath("$.data.name").value("스터디 그룹"))
+            .andExpect(jsonPath("$.data.inviteCode").exists())
+            .andExpect(jsonPath("$.data.role").value("OWNER"))
+
+        val group = groupRepository.findAll().first { it.name == "스터디 그룹" }
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Created owner member not found.")
+
+        assert(member.role == GroupRole.OWNER)
+    }
+
+    @Test
     fun `email verification code can be requested`() {
         mockMvc.perform(
             post("/auth/send-code")
