@@ -82,4 +82,15 @@ class GroupManagementService(
             newOwnerRole = newOwner.role,
         )
     }
+
+    @Transactional
+    fun leave(user: UserAccount, groupId: Long) {
+        val access = groupPermissionService.requireMember(user, groupId)
+
+        if (access.member.role == GroupRole.OWNER) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "OWNER는 권한 양도 후 퇴장할 수 있습니다.")
+        }
+
+        groupMemberRepository.delete(access.member)
+    }
 }

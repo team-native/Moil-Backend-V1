@@ -141,6 +141,17 @@ class GroupController(
         )
     }
 
+    @PostMapping("/{groupId:[0-9]+}/leave")
+    fun leave(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+    ): ApiResponse<Nothing> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+        groupManagementService.leave(user, groupId)
+
+        return ApiResponse.empty("그룹에서 퇴장했습니다.")
+    }
+
     @PostMapping
     fun create(
         @RequestHeader("Authorization", required = false) authorization: String?,
