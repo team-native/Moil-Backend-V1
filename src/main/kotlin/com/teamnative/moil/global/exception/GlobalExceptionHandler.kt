@@ -3,6 +3,7 @@ package com.teamnative.moil.global.exception
 import com.teamnative.moil.global.dto.ApiResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
+import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
@@ -23,6 +24,14 @@ class GlobalExceptionHandler {
             .status(HttpStatus.BAD_REQUEST)
             .body(ApiResponse.failure(HttpStatus.BAD_REQUEST.value(), message))
     }
+
+    @ExceptionHandler(HttpMessageNotReadableException::class)
+    fun handleHttpMessageNotReadableException(
+        exception: HttpMessageNotReadableException,
+    ): ResponseEntity<ApiResponse<Nothing>> =
+        ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse.failure(HttpStatus.BAD_REQUEST.value(), "요청 형식이 올바르지 않습니다."))
 
     @ExceptionHandler(NoResourceFoundException::class)
     fun handleNoResourceFoundException(exception: NoResourceFoundException): ResponseEntity<ApiResponse<Nothing>> =

@@ -1,0 +1,31 @@
+package com.teamnative.moil.domain.group.repository
+
+import com.teamnative.moil.domain.group.model.GroupMember
+import com.teamnative.moil.domain.group.model.GroupRole
+import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Query
+import org.springframework.stereotype.Repository
+
+@Repository
+interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
+    fun existsByGroupIdAndUserId(groupId: Long, userId: Long): Boolean
+
+    fun findByGroupIdAndUserId(groupId: Long, userId: Long): GroupMember?
+
+    fun findAllByUserId(userId: Long): List<GroupMember>
+
+    fun findAllByGroupId(groupId: Long): List<GroupMember>
+
+    fun countByGroupId(groupId: Long): Long
+
+    @Query(
+        """
+        select member
+        from GroupMember member
+        where (member.role = :ownerRole and member.ownerGroupId <> member.groupId)
+           or (member.role = :ownerRole and member.ownerGroupId is null)
+           or (member.role <> :ownerRole and member.ownerGroupId is not null)
+        """,
+    )
+    fun findOwnerGroupIdMismatches(ownerRole: GroupRole = GroupRole.OWNER): List<GroupMember>
+}
