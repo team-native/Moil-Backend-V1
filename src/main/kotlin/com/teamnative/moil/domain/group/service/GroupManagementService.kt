@@ -1,6 +1,7 @@
 package com.teamnative.moil.domain.group.service
 
 import com.teamnative.moil.domain.auth.model.UserAccount
+import com.teamnative.moil.domain.group.dto.TransferGroupOwnerResponse
 import com.teamnative.moil.domain.group.dto.UpdateGroupMemberRoleResponse
 import com.teamnative.moil.domain.group.dto.UpdateGroupNameResponse
 import com.teamnative.moil.domain.group.model.GroupRole
@@ -56,6 +57,29 @@ class GroupManagementService(
             groupId = groupId,
             memberId = updatedMember.id,
             role = updatedMember.role,
+        )
+    }
+
+    @Transactional
+    fun transferOwner(user: UserAccount, groupId: Long, memberId: Long): TransferGroupOwnerResponse {
+        val access = groupPermissionService.requireOwner(user, groupId)
+        val targetMember = groupMemberRepository.findById(memberId).orElse(null)
+            ?.takeIf { it.groupId == groupId }
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "대상 멤버를 찾을 수 없습니다.")
+
+        if (targetMember.id == access.member.id) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 그룹 관리자입니다.")
+        }
+
+        val previousOwner = groupMemberRepository.save(access.member.copy(role = GroupRole.ADMIN))
+        val newOwner = groupMemberRepository.save(targetMember.copy(role = GroupRole.OWNER))
+
+        return TransferGroupOwnerResponse(
+            groupId = groupId,
+            previousOwnerMemberId = previousOwner.id,
+            previousOwnerRole = previousOwner.role,
+            newOwnerMemberId = newOwner.id,
+            newOwnerRole = newOwner.role,
         )
     }
 }

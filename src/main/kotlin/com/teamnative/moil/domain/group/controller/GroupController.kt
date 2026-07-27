@@ -10,6 +10,8 @@ import com.teamnative.moil.domain.group.dto.GroupMemberResponse
 import com.teamnative.moil.domain.group.dto.GroupSummaryResponse
 import com.teamnative.moil.domain.group.dto.JoinGroupRequest
 import com.teamnative.moil.domain.group.dto.JoinGroupResponse
+import com.teamnative.moil.domain.group.dto.TransferGroupOwnerRequest
+import com.teamnative.moil.domain.group.dto.TransferGroupOwnerResponse
 import com.teamnative.moil.domain.group.dto.UpdateGroupNotificationRequest
 import com.teamnative.moil.domain.group.dto.UpdateGroupNotificationResponse
 import com.teamnative.moil.domain.group.dto.UpdateGroupMemberRoleRequest
@@ -122,6 +124,20 @@ class GroupController(
         return ApiResponse.success(
             message = "그룹 멤버 권한이 변경되었습니다.",
             data = groupManagementService.updateMemberRole(user, groupId, memberId, request.role!!),
+        )
+    }
+
+    @PostMapping("/{groupId:[0-9]+}/owner")
+    fun transferOwner(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+        @Valid @RequestBody request: TransferGroupOwnerRequest,
+    ): ApiResponse<TransferGroupOwnerResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "그룹 관리자 권한이 양도되었습니다.",
+            data = groupManagementService.transferOwner(user, groupId, request.memberId!!),
         )
     }
 
