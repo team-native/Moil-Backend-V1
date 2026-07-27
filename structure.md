@@ -11,7 +11,9 @@ src/main/kotlin/com/teamnative/moil
 │   │   ├── repository
 │   │   └── service
 │   ├── event
-│   │   └── controller
+│   │   ├── controller
+│   │   ├── model
+│   │   └── repository
 │   ├── group
 │   │   ├── controller
 │   │   ├── dto
