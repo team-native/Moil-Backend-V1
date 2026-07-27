@@ -2,6 +2,15 @@ spring:
   application:
     name: moil-backend-v1
 
+moil:
+  smtp:
+    enabled: ${SMTP_ENABLED:false}
+    host: ${SMTP_HOST:smtp.gmail.com}
+    port: ${SMTP_PORT:587}
+    username: ${SMTP_USERNAME:}
+    password: ${SMTP_PASSWORD:}
+    from: ${SMTP_FROM:}
+
 server:
   port: 6500
 

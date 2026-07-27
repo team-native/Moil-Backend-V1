@@ -6,6 +6,7 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 
 @RestControllerAdvice
@@ -28,6 +29,16 @@ class GlobalExceptionHandler {
         ResponseEntity
             .status(HttpStatus.NOT_FOUND)
             .body(ApiResponse.failure(HttpStatus.NOT_FOUND.value(), "Resource not found."))
+
+    @ExceptionHandler(ResponseStatusException::class)
+    fun handleResponseStatusException(exception: ResponseStatusException): ResponseEntity<ApiResponse<Nothing>> {
+        val status = HttpStatus.valueOf(exception.statusCode.value())
+        val message = exception.reason ?: status.reasonPhrase
+
+        return ResponseEntity
+            .status(status)
+            .body(ApiResponse.failure(status.value(), message))
+    }
 
     @ExceptionHandler(Exception::class)
     fun handleException(exception: Exception): ResponseEntity<ApiResponse<Nothing>> =
