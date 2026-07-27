@@ -530,6 +530,23 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `update group member role rejects invalid role`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups/1/members/1/role")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"role":"UNKNOWN"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("요청 형식이 올바르지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
     fun `update group member role returns not found group`() {
         val session = createLoginSession(password = "password")
 

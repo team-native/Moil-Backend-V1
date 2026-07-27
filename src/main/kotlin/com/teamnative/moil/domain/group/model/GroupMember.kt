@@ -16,6 +16,7 @@ import java.time.Instant
     name = "group_members",
     uniqueConstraints = [
         UniqueConstraint(name = "uk_group_members_group_user", columnNames = ["groupId", "userId"]),
+        UniqueConstraint(name = "uk_group_members_owner_group", columnNames = ["ownerGroupId"]),
     ],
 )
 data class GroupMember(
@@ -28,6 +29,9 @@ data class GroupMember(
 
     @Column(nullable = false)
     val userId: Long,
+
+    @Column(nullable = true)
+    val ownerGroupId: Long? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)

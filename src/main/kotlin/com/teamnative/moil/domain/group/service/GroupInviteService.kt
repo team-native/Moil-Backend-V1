@@ -8,6 +8,7 @@ import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -37,15 +38,19 @@ class GroupInviteService(
     fun join(user: UserAccount, inviteCode: String): JoinGroupResponse {
         val group = findJoinableGroup(user, inviteCode)
 
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = user.id,
-                role = GroupRole.MEMBER,
-                notificationEnabled = true,
-                joinedAt = Instant.now(clock),
-            ),
-        )
+        try {
+            groupMemberRepository.saveAndFlush(
+                GroupMember(
+                    groupId = group.id,
+                    userId = user.id,
+                    role = GroupRole.MEMBER,
+                    notificationEnabled = true,
+                    joinedAt = Instant.now(clock),
+                ),
+            )
+        } catch (exception: DataIntegrityViolationException) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "이미 참가한 그룹입니다.")
+        }
 
         return JoinGroupResponse(
             groupId = group.id,

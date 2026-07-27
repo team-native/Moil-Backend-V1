@@ -34,6 +34,7 @@ class GroupCreateService(
             GroupMember(
                 groupId = group.id,
                 userId = user.id,
+                ownerGroupId = group.id,
                 role = GroupRole.OWNER,
                 notificationEnabled = true,
                 joinedAt = Instant.now(clock),

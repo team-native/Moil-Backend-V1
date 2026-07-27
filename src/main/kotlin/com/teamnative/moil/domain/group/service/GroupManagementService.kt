@@ -51,7 +51,12 @@ class GroupManagementService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "OWNER 권한은 변경할 수 없습니다.")
         }
 
-        val updatedMember = groupMemberRepository.save(targetMember.copy(role = role))
+        val updatedMember = groupMemberRepository.save(
+            targetMember.copy(
+                role = role,
+                ownerGroupId = null,
+            ),
+        )
 
         return UpdateGroupMemberRoleResponse(
             groupId = groupId,
@@ -71,8 +76,18 @@ class GroupManagementService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미 그룹 관리자입니다.")
         }
 
-        val previousOwner = groupMemberRepository.save(access.member.copy(role = GroupRole.ADMIN))
-        val newOwner = groupMemberRepository.save(targetMember.copy(role = GroupRole.OWNER))
+        val previousOwner = groupMemberRepository.save(
+            access.member.copy(
+                role = GroupRole.ADMIN,
+                ownerGroupId = null,
+            ),
+        )
+        val newOwner = groupMemberRepository.save(
+            targetMember.copy(
+                role = GroupRole.OWNER,
+                ownerGroupId = groupId,
+            ),
+        )
 
         return TransferGroupOwnerResponse(
             groupId = groupId,
