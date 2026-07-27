@@ -6,11 +6,13 @@ import com.teamnative.moil.domain.group.dto.CheckGroupInviteResponse
 import com.teamnative.moil.domain.group.dto.CreateGroupRequest
 import com.teamnative.moil.domain.group.dto.CreateGroupResponse
 import com.teamnative.moil.domain.group.dto.GroupDetailResponse
+import com.teamnative.moil.domain.group.dto.GroupMemberResponse
 import com.teamnative.moil.domain.group.dto.GroupSummaryResponse
 import com.teamnative.moil.domain.group.dto.JoinGroupRequest
 import com.teamnative.moil.domain.group.dto.JoinGroupResponse
 import com.teamnative.moil.domain.group.service.GroupCreateService
 import com.teamnative.moil.domain.group.service.GroupInviteService
+import com.teamnative.moil.domain.group.service.GroupMemberQueryService
 import com.teamnative.moil.domain.group.service.GroupQueryService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
@@ -29,6 +31,7 @@ class GroupController(
     private val groupQueryService: GroupQueryService,
     private val groupCreateService: GroupCreateService,
     private val groupInviteService: GroupInviteService,
+    private val groupMemberQueryService: GroupMemberQueryService,
 ) {
 
     @GetMapping
@@ -53,6 +56,19 @@ class GroupController(
         return ApiResponse.success(
             message = "그룹 정보를 조회했습니다.",
             data = groupQueryService.findGroup(user, groupId),
+        )
+    }
+
+    @GetMapping("/{groupId:[0-9]+}/members")
+    fun members(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+    ): ApiResponse<List<GroupMemberResponse>> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "그룹 멤버 목록을 조회했습니다.",
+            data = groupMemberQueryService.findMembers(user, groupId),
         )
     }
 
