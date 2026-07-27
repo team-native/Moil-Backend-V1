@@ -12,8 +12,11 @@ import com.teamnative.moil.domain.group.dto.JoinGroupRequest
 import com.teamnative.moil.domain.group.dto.JoinGroupResponse
 import com.teamnative.moil.domain.group.dto.UpdateGroupNotificationRequest
 import com.teamnative.moil.domain.group.dto.UpdateGroupNotificationResponse
+import com.teamnative.moil.domain.group.dto.UpdateGroupNameRequest
+import com.teamnative.moil.domain.group.dto.UpdateGroupNameResponse
 import com.teamnative.moil.domain.group.service.GroupCreateService
 import com.teamnative.moil.domain.group.service.GroupInviteService
+import com.teamnative.moil.domain.group.service.GroupManagementService
 import com.teamnative.moil.domain.group.service.GroupMemberQueryService
 import com.teamnative.moil.domain.group.service.GroupNotificationService
 import com.teamnative.moil.domain.group.service.GroupQueryService
@@ -36,6 +39,7 @@ class GroupController(
     private val groupInviteService: GroupInviteService,
     private val groupMemberQueryService: GroupMemberQueryService,
     private val groupNotificationService: GroupNotificationService,
+    private val groupManagementService: GroupManagementService,
 ) {
 
     @GetMapping
@@ -87,6 +91,20 @@ class GroupController(
         return ApiResponse.success(
             message = "그룹 알림 설정이 변경되었습니다.",
             data = groupNotificationService.update(user, groupId, request.notificationEnabled!!),
+        )
+    }
+
+    @PostMapping("/{groupId:[0-9]+}/name")
+    fun updateName(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+        @Valid @RequestBody request: UpdateGroupNameRequest,
+    ): ApiResponse<UpdateGroupNameResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "그룹 이름이 변경되었습니다.",
+            data = groupManagementService.updateName(user, groupId, request.name),
         )
     }
 
