@@ -13,6 +13,9 @@ spring:
     open-in-view: false
 
 moil:
+  jwt:
+    secret: ${JWT_SECRET:moil-local-development-secret-key-must-be-at-least-32-bytes}
+    access-token-expires-in: ${JWT_ACCESS_TOKEN_EXPIRES_IN:3600}
   smtp:
     enabled: ${SMTP_ENABLED:false}
     host: ${SMTP_HOST:smtp.gmail.com}

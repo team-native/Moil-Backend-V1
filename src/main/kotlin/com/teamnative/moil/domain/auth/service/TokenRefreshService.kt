@@ -3,10 +3,13 @@ package com.teamnative.moil.domain.auth.service
 import com.teamnative.moil.domain.auth.dto.RefreshTokenResponse
 import com.teamnative.moil.domain.auth.model.LoginSession
 import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
+import com.teamnative.moil.domain.auth.repository.UserAccountRepository
+import com.teamnative.moil.global.config.JwtProperties
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import java.lang.Exception
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
@@ -14,13 +17,17 @@ import java.util.UUID
 @Service
 class TokenRefreshService(
     private val loginSessionRepository: LoginSessionRepository,
+    private val userAccountRepository: UserAccountRepository,
+    private val jwtProvider: JwtProvider,
+    private val jwtProperties: JwtProperties,
     private val clock: Clock,
 ) {
 
     @Transactional
     fun refresh(authorization: String?, refreshToken: String): RefreshTokenResponse {
         val accessToken = authorization.extractBearerToken()
-        val session = loginSessionRepository.findById(accessToken).orElse(null)
+        val claims = accessToken.validateJwt()
+        val session = loginSessionRepository.findByAccessToken(accessToken)
             ?: throw unauthorized()
 
         if (session.expiresAt.isBefore(Instant.now(clock))) {
@@ -32,16 +39,19 @@ class TokenRefreshService(
             throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "리프레시 토큰이 유효하지 않습니다.")
         }
 
-        val newAccessToken = "access_${UUID.randomUUID()}"
+        val user = userAccountRepository.findById(claims.userId).orElse(null)
+            ?: throw unauthorized()
+        val newAccessToken = jwtProvider.generateAccessToken(user)
         val newRefreshToken = "refresh_${UUID.randomUUID()}"
 
         loginSessionRepository.delete(session)
         loginSessionRepository.save(
             LoginSession(
+                sessionId = "sess_${UUID.randomUUID()}",
                 accessToken = newAccessToken,
                 userId = session.userId,
                 refreshToken = newRefreshToken,
-                expiresAt = Instant.now(clock).plusSeconds(ACCESS_TOKEN_EXPIRES_IN_SECONDS),
+                expiresAt = Instant.now(clock).plusSeconds(jwtProperties.accessTokenExpiresIn),
             ),
         )
 
@@ -49,7 +59,7 @@ class TokenRefreshService(
             accessToken = newAccessToken,
             refreshToken = newRefreshToken,
             tokenType = "Bearer",
-            expiresIn = ACCESS_TOKEN_EXPIRES_IN_SECONDS,
+            expiresIn = jwtProperties.accessTokenExpiresIn,
         )
     }
 
@@ -61,11 +71,17 @@ class TokenRefreshService(
             ?.takeIf { it.isNotBlank() }
             ?: throw unauthorized()
 
+    private fun String.validateJwt(): JwtProvider.JwtClaims =
+        try {
+            jwtProvider.validate(this)
+        } catch (exception: Exception) {
+            throw unauthorized()
+        }
+
     private fun unauthorized(): ResponseStatusException =
         ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인되어 있지 않습니다.")
 
     companion object {
         private const val BEARER_PREFIX = "Bearer "
-        private const val ACCESS_TOKEN_EXPIRES_IN_SECONDS = 3600L
     }
 }

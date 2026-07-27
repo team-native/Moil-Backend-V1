@@ -9,7 +9,7 @@ import java.time.Clock
 import java.util.Properties
 
 @Configuration
-@EnableConfigurationProperties(SmtpProperties::class)
+@EnableConfigurationProperties(SmtpProperties::class, JwtProperties::class)
 class MailConfig {
 
     @Bean

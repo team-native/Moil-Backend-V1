@@ -10,6 +10,9 @@ import java.time.Instant
 @Table(name = "login_sessions")
 data class LoginSession(
     @Id
+    val sessionId: String,
+
+    @Column(nullable = false, unique = true, length = 1024)
     val accessToken: String,
 
     @Column(nullable = false)

@@ -4,6 +4,8 @@ import com.teamnative.moil.domain.auth.model.LoginSession
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
 import com.teamnative.moil.domain.auth.repository.UserAccountRepository
+import com.teamnative.moil.domain.auth.service.JwtProvider
+import com.teamnative.moil.global.config.JwtProperties
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -34,6 +36,12 @@ class SecurityConfigTest {
 
     @Autowired
     private lateinit var passwordEncoder: PasswordEncoder
+
+    @Autowired
+    private lateinit var jwtProvider: JwtProvider
+
+    @Autowired
+    private lateinit var jwtProperties: JwtProperties
 
     @Test
     fun `health endpoint is permitted`() {
@@ -381,15 +389,16 @@ class SecurityConfigTest {
                 passwordHash = passwordHash,
             ),
         )
-        val accessToken = "access_$id"
+        val accessToken = jwtProvider.generateAccessToken(user)
         val refreshToken = "refresh_$id"
 
         loginSessionRepository.save(
             LoginSession(
+                sessionId = "sess_$id",
                 accessToken = accessToken,
                 userId = user.id,
                 refreshToken = refreshToken,
-                expiresAt = Instant.now().plusSeconds(3600),
+                expiresAt = Instant.now().plusSeconds(jwtProperties.accessTokenExpiresIn),
             ),
         )
 

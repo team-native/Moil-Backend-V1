@@ -3,6 +3,7 @@ package com.teamnative.moil.domain.auth.service
 import com.teamnative.moil.domain.auth.model.LoginSession
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
+import com.teamnative.moil.global.config.JwtProperties
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -12,6 +13,8 @@ import java.util.UUID
 @Service
 class AuthTokenService(
     private val loginSessionRepository: LoginSessionRepository,
+    private val jwtProvider: JwtProvider,
+    private val jwtProperties: JwtProperties,
     private val clock: Clock,
 ) {
 
@@ -28,15 +31,16 @@ class AuthTokenService(
             loginSessionRepository.deleteByUserId(user.id)
         }
 
-        val accessToken = "access_${UUID.randomUUID()}"
+        val accessToken = jwtProvider.generateAccessToken(user)
         val refreshToken = "refresh_${UUID.randomUUID()}"
 
         loginSessionRepository.save(
             LoginSession(
+                sessionId = "sess_${UUID.randomUUID()}",
                 accessToken = accessToken,
                 userId = user.id,
                 refreshToken = refreshToken,
-                expiresAt = Instant.now(clock).plusSeconds(ACCESS_TOKEN_EXPIRES_IN_SECONDS),
+                expiresAt = Instant.now(clock).plusSeconds(jwtProperties.accessTokenExpiresIn),
             ),
         )
 
@@ -47,7 +51,7 @@ class AuthTokenService(
             accessToken = accessToken,
             refreshToken = refreshToken,
             tokenType = "Bearer",
-            expiresIn = ACCESS_TOKEN_EXPIRES_IN_SECONDS,
+            expiresIn = jwtProperties.accessTokenExpiresIn,
         )
     }
 
@@ -61,7 +65,4 @@ class AuthTokenService(
         val expiresIn: Long,
     )
 
-    companion object {
-        private const val ACCESS_TOKEN_EXPIRES_IN_SECONDS = 3600L
-    }
 }

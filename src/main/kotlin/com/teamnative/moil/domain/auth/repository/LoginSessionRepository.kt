@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository
 @Repository
 interface LoginSessionRepository : JpaRepository<LoginSession, String> {
     fun deleteByUserId(userId: Long)
+
+    fun findByAccessToken(accessToken: String): LoginSession?
 }
