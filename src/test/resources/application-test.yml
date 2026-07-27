@@ -1,0 +1,17 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:moil-test;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+
+moil:
+  jwt:
+    secret: moil-test-jwt-secret-key-must-be-at-least-32-bytes
+    access-token-expires-in: 3600
+  smtp:
+    enabled: false
