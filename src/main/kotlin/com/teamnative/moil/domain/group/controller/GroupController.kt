@@ -6,6 +6,8 @@ import com.teamnative.moil.domain.group.dto.CheckGroupInviteResponse
 import com.teamnative.moil.domain.group.dto.CreateGroupRequest
 import com.teamnative.moil.domain.group.dto.CreateGroupResponse
 import com.teamnative.moil.domain.group.dto.GroupSummaryResponse
+import com.teamnative.moil.domain.group.dto.JoinGroupRequest
+import com.teamnative.moil.domain.group.dto.JoinGroupResponse
 import com.teamnative.moil.domain.group.service.GroupCreateService
 import com.teamnative.moil.domain.group.service.GroupInviteService
 import com.teamnative.moil.domain.group.service.GroupQueryService
@@ -62,6 +64,19 @@ class GroupController(
         return ApiResponse.success(
             message = "참가 가능한 그룹입니다.",
             data = groupInviteService.check(user, request.inviteCode),
+        )
+    }
+
+    @PostMapping("/join")
+    fun join(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @Valid @RequestBody request: JoinGroupRequest,
+    ): ApiResponse<JoinGroupResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "그룹에 참가했습니다.",
+            data = groupInviteService.join(user, request.inviteCode),
         )
     }
 }
