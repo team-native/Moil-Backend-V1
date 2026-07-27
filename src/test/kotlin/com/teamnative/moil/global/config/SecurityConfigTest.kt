@@ -295,6 +295,105 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `update group notification requires login session`() {
+        mockMvc.perform(
+            post("/groups/1/notification")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"notificationEnabled":false}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group notification requires setting value`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups/1/notification")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("알림 설정 여부를 입력해주세요."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group notification returns not found`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups/999999/notification")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"notificationEnabled":false}"""),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group notification rejects non member`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+
+        mockMvc.perform(
+            post("/groups/${group.id}/notification")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"notificationEnabled":false}"""),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(403))
+            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group notification changes member setting`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                notificationEnabled = true,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/${group.id}/notification")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"notificationEnabled":false}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("그룹 알림 설정이 변경되었습니다."))
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.notificationEnabled").value(false))
+
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Group member not found.")
+
+        assert(!member.notificationEnabled)
+    }
+
+    @Test
     fun `create group requires login session`() {
         mockMvc.perform(
             post("/groups")
