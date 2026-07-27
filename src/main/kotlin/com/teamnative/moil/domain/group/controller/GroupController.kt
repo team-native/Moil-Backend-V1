@@ -12,6 +12,8 @@ import com.teamnative.moil.domain.group.dto.JoinGroupRequest
 import com.teamnative.moil.domain.group.dto.JoinGroupResponse
 import com.teamnative.moil.domain.group.dto.UpdateGroupNotificationRequest
 import com.teamnative.moil.domain.group.dto.UpdateGroupNotificationResponse
+import com.teamnative.moil.domain.group.dto.UpdateGroupMemberRoleRequest
+import com.teamnative.moil.domain.group.dto.UpdateGroupMemberRoleResponse
 import com.teamnative.moil.domain.group.dto.UpdateGroupNameRequest
 import com.teamnative.moil.domain.group.dto.UpdateGroupNameResponse
 import com.teamnative.moil.domain.group.service.GroupCreateService
@@ -105,6 +107,21 @@ class GroupController(
         return ApiResponse.success(
             message = "그룹 이름이 변경되었습니다.",
             data = groupManagementService.updateName(user, groupId, request.name),
+        )
+    }
+
+    @PostMapping("/{groupId:[0-9]+}/members/{memberId:[0-9]+}/role")
+    fun updateMemberRole(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+        @PathVariable memberId: Long,
+        @Valid @RequestBody request: UpdateGroupMemberRoleRequest,
+    ): ApiResponse<UpdateGroupMemberRoleResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "그룹 멤버 권한이 변경되었습니다.",
+            data = groupManagementService.updateMemberRole(user, groupId, memberId, request.role!!),
         )
     }
 

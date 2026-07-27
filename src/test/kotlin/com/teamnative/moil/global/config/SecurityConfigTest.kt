@@ -499,6 +499,228 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `update group member role requires login session`() {
+        mockMvc.perform(
+            post("/groups/1/members/1/role")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"role":"ADMIN"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group member role requires role`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups/1/members/1/role")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("변경할 권한을 입력해주세요."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group member role returns not found group`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups/999999/members/1/role")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"role":"ADMIN"}"""),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group member role rejects member role`() {
+        val managerSession = createLoginSession(password = "password")
+        val targetSession = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.saveAll(
+            listOf(
+                GroupMember(
+                    groupId = group.id,
+                    userId = managerSession.userId,
+                    role = GroupRole.MEMBER,
+                    joinedAt = Instant.now(),
+                ),
+                GroupMember(
+                    groupId = group.id,
+                    userId = targetSession.userId,
+                    role = GroupRole.MEMBER,
+                    joinedAt = Instant.now(),
+                ),
+            ),
+        )
+        val targetMember = groupMemberRepository.findByGroupIdAndUserId(group.id, targetSession.userId)
+            ?: error("Target member not found.")
+
+        mockMvc.perform(
+            post("/groups/${group.id}/members/${targetMember.id}/role")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${managerSession.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"role":"ADMIN"}"""),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(403))
+            .andExpect(jsonPath("$.message").value("그룹 권한이 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group member role returns not found target member`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.ADMIN,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/${group.id}/members/999999/role")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"role":"ADMIN"}"""),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("대상 멤버를 찾을 수 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group member role rejects owner role request`() {
+        val session = createLoginSession(password = "password")
+        val targetSession = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.ADMIN,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val targetMember = groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = targetSession.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/${group.id}/members/${targetMember.id}/role")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"role":"OWNER"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("OWNER 권한은 양도 API를 사용해주세요."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group member role rejects target owner`() {
+        val session = createLoginSession(password = "password")
+        val ownerSession = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.ADMIN,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val ownerMember = groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = ownerSession.userId,
+                role = GroupRole.OWNER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/${group.id}/members/${ownerMember.id}/role")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"role":"ADMIN"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("OWNER 권한은 변경할 수 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update group member role changes target role`() {
+        val session = createLoginSession(password = "password")
+        val targetSession = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.OWNER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val targetMember = groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = targetSession.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/${group.id}/members/${targetMember.id}/role")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"role":"ADMIN"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("그룹 멤버 권한이 변경되었습니다."))
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.memberId").value(targetMember.id))
+            .andExpect(jsonPath("$.data.role").value("ADMIN"))
+
+        val updatedMember = groupMemberRepository.findById(targetMember.id).orElseThrow()
+
+        assert(updatedMember.role == GroupRole.ADMIN)
+    }
+
+    @Test
     fun `create group requires login session`() {
         mockMvc.perform(
             post("/groups")
