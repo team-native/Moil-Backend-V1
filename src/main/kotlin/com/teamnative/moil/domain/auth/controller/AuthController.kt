@@ -1,10 +1,13 @@
 package com.teamnative.moil.domain.auth.controller
 
+import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
+import com.teamnative.moil.domain.auth.dto.ConfirmSignupRequest
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeRequest
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeResponse
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeRequest
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeResponse
 import com.teamnative.moil.domain.auth.service.EmailVerificationService
+import com.teamnative.moil.domain.auth.service.SignupService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.GetMapping
@@ -17,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/auth")
 class AuthController(
     private val emailVerificationService: EmailVerificationService,
+    private val signupService: SignupService,
 ) {
 
     @GetMapping
@@ -38,5 +42,14 @@ class AuthController(
         ApiResponse.success(
             message = "인증이 완료되었습니다.",
             data = emailVerificationService.verifyCode(request.verifyId, request.code),
+        )
+
+    @PostMapping("/confirm")
+    fun confirm(
+        @Valid @RequestBody request: ConfirmSignupRequest,
+    ): ApiResponse<AuthTokenResponse> =
+        ApiResponse.success(
+            message = "회원가입이 완료되었습니다.",
+            data = signupService.confirm(request.sessionId, request.password, request.pwd),
         )
 }

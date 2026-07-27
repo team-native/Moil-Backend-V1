@@ -93,4 +93,32 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.message").value("인증 요청이 없거나 만료되었습니다."))
             .andExpect(jsonPath("$.data").doesNotExist())
     }
+
+    @Test
+    fun `signup confirm validates matching passwords`() {
+        mockMvc.perform(
+            post("/auth/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"sessionId":"sess_verify_unknown","password":"password1","pwd":"password2"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("비밀번호가 일치하지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `signup confirm requires verified session`() {
+        mockMvc.perform(
+            post("/auth/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"sessionId":"sess_verify_unknown","password":"password","pwd":"password"}"""),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("회원가입 세션이 없거나 만료되었습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
 }

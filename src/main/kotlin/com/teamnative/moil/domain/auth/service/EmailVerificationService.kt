@@ -64,6 +64,20 @@ class EmailVerificationService(
         return VerifyEmailCodeResponse(sessionId = sessionId)
     }
 
+    fun consumeVerifiedSession(sessionId: String): String {
+        val session = verifiedSessions[sessionId]
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "회원가입 세션이 없거나 만료되었습니다.")
+
+        if (session.expiresAt.isBefore(Instant.now(clock))) {
+            verifiedSessions.remove(sessionId)
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "회원가입 세션이 없거나 만료되었습니다.")
+        }
+
+        verifiedSessions.remove(sessionId)
+
+        return session.email
+    }
+
     private fun sendMail(email: String, code: String) {
         val message = SimpleMailMessage().apply {
             from = smtpProperties.from.ifBlank { smtpProperties.username }
