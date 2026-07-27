@@ -3,12 +3,14 @@ package com.teamnative.moil.domain.auth.controller
 import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
 import com.teamnative.moil.domain.auth.dto.ConfirmSignupRequest
 import com.teamnative.moil.domain.auth.dto.LoginRequest
+import com.teamnative.moil.domain.auth.dto.ResetPasswordRequest
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeRequest
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeResponse
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeRequest
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeResponse
 import com.teamnative.moil.domain.auth.service.EmailVerificationService
 import com.teamnative.moil.domain.auth.service.LoginService
+import com.teamnative.moil.domain.auth.service.PasswordResetService
 import com.teamnative.moil.domain.auth.service.SignupService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
@@ -24,6 +26,7 @@ class AuthController(
     private val emailVerificationService: EmailVerificationService,
     private val signupService: SignupService,
     private val loginService: LoginService,
+    private val passwordResetService: PasswordResetService,
 ) {
 
     @GetMapping
@@ -64,4 +67,13 @@ class AuthController(
             message = "로그인되었습니다.",
             data = loginService.login(request.email, request.password),
         )
+
+    @PostMapping("/reset-password")
+    fun resetPassword(
+        @Valid @RequestBody request: ResetPasswordRequest,
+    ): ApiResponse<Nothing> {
+        passwordResetService.reset(request.sessionId, request.password, request.pwd)
+
+        return ApiResponse.empty("비밀번호가 변경되었습니다.")
+    }
 }

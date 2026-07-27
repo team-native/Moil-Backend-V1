@@ -79,13 +79,16 @@ class EmailVerificationService(
     }
 
     @Transactional
-    fun consumeVerifiedSession(sessionId: String): String {
+    fun consumeVerifiedSession(
+        sessionId: String,
+        notFoundMessage: String = "회원가입 세션이 없거나 만료되었습니다.",
+    ): String {
         val session = verifiedSignupSessionRepository.findById(sessionId).orElse(null)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "회원가입 세션이 없거나 만료되었습니다.")
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, notFoundMessage)
 
         if (session.expiresAt.isBefore(Instant.now(clock))) {
             verifiedSignupSessionRepository.delete(session)
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "회원가입 세션이 없거나 만료되었습니다.")
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, notFoundMessage)
         }
 
         verifiedSignupSessionRepository.delete(session)
