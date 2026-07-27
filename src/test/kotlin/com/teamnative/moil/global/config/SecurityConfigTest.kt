@@ -189,6 +189,109 @@ class SecurityConfigTest {
     }
 
     @Test
+    fun `check group invite requires invite code`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups/invite/check")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":""}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("초대 코드를 입력해주세요."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `check group invite requires login session`() {
+        mockMvc.perform(
+            post("/groups/invite/check")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"invite-code"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `check group invite returns not found`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups/invite/check")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"unknown"}"""),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("초대 코드를 찾을 수 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `check group invite rejects already joined member`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/invite/check")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"${group.inviteCode}"}"""),
+        )
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(409))
+            .andExpect(jsonPath("$.message").value("이미 참가한 그룹입니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `check group invite returns group information`() {
+        val session = createLoginSession(password = "password")
+        val otherSession = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = otherSession.userId,
+                role = GroupRole.OWNER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/invite/check")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"${group.inviteCode}"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("참가 가능한 그룹입니다."))
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.name").value("스터디 그룹"))
+            .andExpect(jsonPath("$.data.memberCount").value(1))
+    }
+
+    @Test
     fun `email verification code can be requested`() {
         mockMvc.perform(
             post("/auth/send-code")

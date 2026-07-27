@@ -1,10 +1,13 @@
 package com.teamnative.moil.domain.group.controller
 
 import com.teamnative.moil.domain.auth.service.AuthenticatedUserService
+import com.teamnative.moil.domain.group.dto.CheckGroupInviteRequest
+import com.teamnative.moil.domain.group.dto.CheckGroupInviteResponse
 import com.teamnative.moil.domain.group.dto.CreateGroupRequest
 import com.teamnative.moil.domain.group.dto.CreateGroupResponse
 import com.teamnative.moil.domain.group.dto.GroupSummaryResponse
 import com.teamnative.moil.domain.group.service.GroupCreateService
+import com.teamnative.moil.domain.group.service.GroupInviteService
 import com.teamnative.moil.domain.group.service.GroupQueryService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
@@ -21,6 +24,7 @@ class GroupController(
     private val authenticatedUserService: AuthenticatedUserService,
     private val groupQueryService: GroupQueryService,
     private val groupCreateService: GroupCreateService,
+    private val groupInviteService: GroupInviteService,
 ) {
 
     @GetMapping
@@ -45,6 +49,19 @@ class GroupController(
         return ApiResponse.success(
             message = "그룹이 생성되었습니다.",
             data = groupCreateService.create(user, request.name),
+        )
+    }
+
+    @PostMapping("/invite/check")
+    fun checkInvite(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @Valid @RequestBody request: CheckGroupInviteRequest,
+    ): ApiResponse<CheckGroupInviteResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "참가 가능한 그룹입니다.",
+            data = groupInviteService.check(user, request.inviteCode),
         )
     }
 }
