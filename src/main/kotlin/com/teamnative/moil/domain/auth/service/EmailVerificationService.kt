@@ -2,36 +2,45 @@ package com.teamnative.moil.domain.auth.service
 
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeResponse
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeResponse
+import com.teamnative.moil.domain.auth.model.EmailVerification
+import com.teamnative.moil.domain.auth.model.VerifiedSignupSession
+import com.teamnative.moil.domain.auth.repository.EmailVerificationRepository
+import com.teamnative.moil.domain.auth.repository.VerifiedSignupSessionRepository
 import com.teamnative.moil.global.config.SmtpProperties
+import org.springframework.http.HttpStatus
 import org.springframework.mail.SimpleMailMessage
 import org.springframework.mail.javamail.JavaMailSender
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
-import org.springframework.http.HttpStatus
 import java.time.Clock
 import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 @Service
 class EmailVerificationService(
     private val mailSender: JavaMailSender,
     private val smtpProperties: SmtpProperties,
-    private val clock: Clock = Clock.systemUTC(),
+    private val emailVerificationRepository: EmailVerificationRepository,
+    private val verifiedSignupSessionRepository: VerifiedSignupSessionRepository,
+    private val clock: Clock,
 ) {
-    private val verifications = ConcurrentHashMap<String, EmailVerification>()
-    private val verifiedSessions = ConcurrentHashMap<String, VerifiedSession>()
 
+    @Transactional
     fun sendCode(email: String): SendEmailCodeResponse {
         val verifyId = "ver_${UUID.randomUUID()}"
         val code = Random.nextInt(100000, 1000000).toString()
         val expiresAt = Instant.now(clock).plusSeconds(EMAIL_CODE_TTL_SECONDS)
 
-        verifications[verifyId] = EmailVerification(
-            email = email,
-            code = code,
-            expiresAt = expiresAt,
+        emailVerificationRepository.deleteByExpiresAtBefore(Instant.now(clock))
+        emailVerificationRepository.save(
+            EmailVerification(
+                verifyId = verifyId,
+                email = email,
+                code = code,
+                expiresAt = expiresAt,
+            ),
         )
 
         if (smtpProperties.enabled) {
@@ -41,12 +50,13 @@ class EmailVerificationService(
         return SendEmailCodeResponse(verifyId = verifyId)
     }
 
+    @Transactional
     fun verifyCode(verifyId: String, code: String): VerifyEmailCodeResponse {
-        val verification = verifications[verifyId]
+        val verification = emailVerificationRepository.findById(verifyId).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "인증 요청이 없거나 만료되었습니다.")
 
         if (verification.expiresAt.isBefore(Instant.now(clock))) {
-            verifications.remove(verifyId)
+            emailVerificationRepository.delete(verification)
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "인증 요청이 없거나 만료되었습니다.")
         }
 
@@ -55,25 +65,30 @@ class EmailVerificationService(
         }
 
         val sessionId = "sess_verify_${UUID.randomUUID()}"
-        verifiedSessions[sessionId] = VerifiedSession(
-            email = verification.email,
-            expiresAt = Instant.now(clock).plusSeconds(VERIFIED_SESSION_TTL_SECONDS),
+        verifiedSignupSessionRepository.deleteByExpiresAtBefore(Instant.now(clock))
+        verifiedSignupSessionRepository.save(
+            VerifiedSignupSession(
+                sessionId = sessionId,
+                email = verification.email,
+                expiresAt = Instant.now(clock).plusSeconds(VERIFIED_SESSION_TTL_SECONDS),
+            ),
         )
-        verifications.remove(verifyId)
+        emailVerificationRepository.delete(verification)
 
         return VerifyEmailCodeResponse(sessionId = sessionId)
     }
 
+    @Transactional
     fun consumeVerifiedSession(sessionId: String): String {
-        val session = verifiedSessions[sessionId]
+        val session = verifiedSignupSessionRepository.findById(sessionId).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "회원가입 세션이 없거나 만료되었습니다.")
 
         if (session.expiresAt.isBefore(Instant.now(clock))) {
-            verifiedSessions.remove(sessionId)
+            verifiedSignupSessionRepository.delete(session)
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "회원가입 세션이 없거나 만료되었습니다.")
         }
 
-        verifiedSessions.remove(sessionId)
+        verifiedSignupSessionRepository.delete(session)
 
         return session.email
     }
@@ -88,17 +103,6 @@ class EmailVerificationService(
 
         mailSender.send(message)
     }
-
-    private data class EmailVerification(
-        val email: String,
-        val code: String,
-        val expiresAt: Instant,
-    )
-
-    private data class VerifiedSession(
-        val email: String,
-        val expiresAt: Instant,
-    )
 
     companion object {
         private const val EMAIL_CODE_TTL_SECONDS = 5 * 60L

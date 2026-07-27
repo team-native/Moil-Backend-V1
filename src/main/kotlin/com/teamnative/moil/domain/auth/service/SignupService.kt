@@ -1,6 +1,7 @@
 package com.teamnative.moil.domain.auth.service
 
 import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
+import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.auth.repository.UserAccountRepository
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -30,9 +31,11 @@ class SignupService(
             ?: throw ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "비밀번호 암호화에 실패했습니다.")
 
         val user = userAccountRepository.save(
-            name = email.substringBefore("@"),
-            email = email,
-            password = encodedPassword,
+            UserAccount(
+                name = email.substringBefore("@"),
+                email = email,
+                passwordHash = encodedPassword,
+            ),
         )
         val token = authTokenService.issue(user)
 

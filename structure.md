@@ -6,7 +6,10 @@ src/main/kotlin/com/teamnative/moil
 ├── domain
 │   ├── auth
 │   │   ├── controller
-│   │   └── dto
+│   │   ├── dto
+│   │   ├── model
+│   │   ├── repository
+│   │   └── service
 │   ├── event
 │   │   └── controller
 │   ├── group
