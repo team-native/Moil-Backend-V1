@@ -1,4 +1,4 @@
-# Linux 설치 및 실행
+# macOS/Linux 설치 및 실행
 
 ## 요구사항
 

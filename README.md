@@ -7,5 +7,4 @@
 
 - [프로젝트 구조](structure.md)
 - [Windows 설치 및 실행](guide-windows.md)
-- [macOS 설치 및 실행](guide-macos.md)
-- [Linux 설치 및 실행](guide-linux.md)
+- [macOS/Linux 설치 및 실행](guide-unix.md)
