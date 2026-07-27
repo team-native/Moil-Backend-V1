@@ -7,6 +7,8 @@ import jakarta.persistence.Enumerated
 import jakarta.persistence.GeneratedValue
 import jakarta.persistence.GenerationType
 import jakarta.persistence.Id
+import jakarta.persistence.PrePersist
+import jakarta.persistence.PreUpdate
 import jakarta.persistence.Table
 import jakarta.persistence.UniqueConstraint
 import java.time.Instant
@@ -31,7 +33,7 @@ data class GroupMember(
     val userId: Long,
 
     @Column(nullable = true)
-    val ownerGroupId: Long? = null,
+    var ownerGroupId: Long? = null,
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
@@ -42,4 +44,11 @@ data class GroupMember(
 
     @Column(nullable = false)
     val joinedAt: Instant,
-)
+) {
+
+    @PrePersist
+    @PreUpdate
+    fun syncOwnerGroupId() {
+        ownerGroupId = if (role == GroupRole.OWNER) groupId else null
+    }
+}

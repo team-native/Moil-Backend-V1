@@ -1048,6 +1048,35 @@ class SecurityConfigTest {
             ?: error("Created owner member not found.")
 
         assert(member.role == GroupRole.OWNER)
+        assert(member.ownerGroupId == group.id)
+    }
+
+    @Test
+    fun `group member syncs owner group id from role`() {
+        val ownerSession = createLoginSession(password = "password")
+        val memberSession = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+
+        val ownerMember = groupMemberRepository.saveAndFlush(
+            GroupMember(
+                groupId = group.id,
+                userId = ownerSession.userId,
+                role = GroupRole.OWNER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val member = groupMemberRepository.saveAndFlush(
+            GroupMember(
+                groupId = group.id,
+                userId = memberSession.userId,
+                ownerGroupId = group.id,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        assert(ownerMember.ownerGroupId == group.id)
+        assert(member.ownerGroupId == null)
     }
 
     @Test
