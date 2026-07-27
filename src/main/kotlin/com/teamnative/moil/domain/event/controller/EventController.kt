@@ -9,6 +9,7 @@ import com.teamnative.moil.domain.event.service.EventCommandService
 import com.teamnative.moil.domain.event.service.EventQueryService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -100,6 +101,24 @@ class EventController(
                 startsAt = request.startsAt,
                 endsAt = request.endsAt,
             ),
+        )
+    }
+
+    @DeleteMapping("/groups/{groupId:[0-9]+}/{eventId:[0-9]+}")
+    fun deleteGroupEvent(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+        @PathVariable eventId: Long,
+    ): ApiResponse<Nothing> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        eventCommandService.delete(user, groupId, eventId)
+
+        return ApiResponse(
+            success = true,
+            status = 0,
+            message = "그룹 일정이 삭제되었습니다.",
+            data = null,
         )
     }
 }

@@ -91,6 +91,16 @@ class EventCommandService(
         return updatedEvent.toDetailResponse()
     }
 
+    @Transactional
+    fun delete(user: UserAccount, groupId: Long, eventId: Long) {
+        groupPermissionService.requireMember(user, groupId)
+
+        val event = eventRepository.findByIdAndGroupId(eventId, groupId)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다.")
+
+        eventRepository.delete(event)
+    }
+
     private fun String.toInstant(): Instant =
         try {
             Instant.parse(this)

@@ -29,6 +29,7 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import org.springframework.http.MediaType
 import java.time.Instant
 import java.util.UUID
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -798,6 +799,116 @@ class SecurityConfigTest {
         assertEquals(session.userId, updatedEvent.updaterId)
         assertEquals(Instant.parse("2026-01-10T12:00:00Z"), updatedEvent.startsAt)
         assertEquals(Instant.parse("2026-01-10T13:00:00Z"), updatedEvent.endsAt)
+    }
+
+    @Test
+    fun `delete group event requires login session`() {
+        mockMvc.perform(delete("/events/groups/1/1"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `delete group event returns not found group`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            delete("/events/groups/999999/1")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `delete group event rejects non member`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        val event = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "회의",
+            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
+            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
+        )
+
+        mockMvc.perform(
+            delete("/events/groups/${group.id}/${event.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isForbidden)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(403))
+            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `delete group event returns not found event`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            delete("/events/groups/${group.id}/999999")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.message").value("일정을 찾을 수 없습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `delete group event removes event`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val event = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "회의",
+            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
+            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
+        )
+
+        mockMvc.perform(
+            delete("/events/groups/${group.id}/${event.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("그룹 일정이 삭제되었습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+
+        mockMvc.perform(
+            get("/events/groups/${group.id}/${event.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.message").value("일정을 찾을 수 없습니다."))
     }
 
     @Test
