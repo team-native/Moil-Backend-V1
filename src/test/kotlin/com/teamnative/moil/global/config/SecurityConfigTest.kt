@@ -5,6 +5,11 @@ import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
 import com.teamnative.moil.domain.auth.repository.UserAccountRepository
 import com.teamnative.moil.domain.auth.service.JwtProvider
+import com.teamnative.moil.domain.group.model.Group
+import com.teamnative.moil.domain.group.model.GroupMember
+import com.teamnative.moil.domain.group.model.GroupRole
+import com.teamnative.moil.domain.group.repository.GroupMemberRepository
+import com.teamnative.moil.domain.group.repository.GroupRepository
 import com.teamnative.moil.global.config.JwtProperties
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -35,6 +40,12 @@ class SecurityConfigTest {
     private lateinit var loginSessionRepository: LoginSessionRepository
 
     @Autowired
+    private lateinit var groupRepository: GroupRepository
+
+    @Autowired
+    private lateinit var groupMemberRepository: GroupMemberRepository
+
+    @Autowired
     private lateinit var passwordEncoder: PasswordEncoder
 
     @Autowired
@@ -61,10 +72,6 @@ class SecurityConfigTest {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.message").value("/auth"))
 
-        mockMvc.perform(get("/groups"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.message").value("/groups"))
-
         mockMvc.perform(get("/events"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.message").value("/events"))
@@ -83,6 +90,45 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.status").value(404))
             .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `my groups requires login session`() {
+        mockMvc.perform(get("/groups"))
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `my groups returns joined group list`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "스터디 그룹")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.OWNER,
+                notificationEnabled = false,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            get("/groups")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("내 그룹 목록을 조회했습니다."))
+            .andExpect(jsonPath("$.data[0].groupId").value(group.id))
+            .andExpect(jsonPath("$.data[0].name").value("스터디 그룹"))
+            .andExpect(jsonPath("$.data[0].role").value("OWNER"))
+            .andExpect(jsonPath("$.data[0].memberCount").value(1))
+            .andExpect(jsonPath("$.data[0].notificationEnabled").value(false))
     }
 
     @Test
@@ -441,12 +487,23 @@ class SecurityConfigTest {
             accessToken = accessToken,
             refreshToken = refreshToken,
             email = email,
+            userId = user.id,
         )
     }
+
+    private fun createGroup(name: String): Group =
+        groupRepository.save(
+            Group(
+                name = name,
+                inviteCode = "invite_${UUID.randomUUID().toString().take(8)}",
+                createdAt = Instant.now(),
+            ),
+        )
 
     private data class TestLoginSession(
         val accessToken: String,
         val refreshToken: String,
         val email: String,
+        val userId: Long,
     )
 }
