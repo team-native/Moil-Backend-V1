@@ -16,6 +16,10 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
 
     fun findAllByGroupId(groupId: Long): List<GroupMember>
 
+    fun deleteByUserId(userId: Long)
+
+    fun deleteByGroupIdIn(groupIds: Collection<Long>)
+
     fun countByGroupId(groupId: Long): Long
 
     @Query(

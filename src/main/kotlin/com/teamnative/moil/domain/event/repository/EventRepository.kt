@@ -14,4 +14,8 @@ interface EventRepository : JpaRepository<Event, Long> {
     ): List<Event>
 
     fun findByIdAndGroupId(id: Long, groupId: Long): Event?
+
+    fun deleteByCreatorId(creatorId: Long)
+
+    fun deleteByGroupIdIn(groupIds: Collection<Long>)
 }

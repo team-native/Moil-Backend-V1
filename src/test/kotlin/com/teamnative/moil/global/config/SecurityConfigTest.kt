@@ -2513,6 +2513,83 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
     }
 
+    @Test
+    fun `delete account removes own events and owned groups when left data is false`() {
+        val session = createLoginSession(password = "password")
+        val otherSession = createLoginSession(password = "password")
+        val ownedGroup = createGroup(name = "owner-group")
+        val joinedGroup = createGroup(name = "joined-group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = ownedGroup.id,
+                userId = session.userId,
+                role = GroupRole.OWNER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = ownedGroup.id,
+                userId = otherSession.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = joinedGroup.id,
+                userId = otherSession.userId,
+                role = GroupRole.OWNER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = joinedGroup.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val ownEvent = createEvent(
+            groupId = joinedGroup.id,
+            userId = session.userId,
+            title = "own-event",
+            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
+            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
+        )
+        val ownedGroupEvent = createEvent(
+            groupId = ownedGroup.id,
+            userId = otherSession.userId,
+            title = "owned-group-event",
+            startsAt = Instant.parse("2026-01-11T10:00:00Z"),
+            endsAt = Instant.parse("2026-01-11T11:00:00Z"),
+        )
+        val remainingEvent = createEvent(
+            groupId = joinedGroup.id,
+            userId = otherSession.userId,
+            title = "remaining-event",
+            startsAt = Instant.parse("2026-01-12T10:00:00Z"),
+            endsAt = Instant.parse("2026-01-12T11:00:00Z"),
+        )
+
+        mockMvc.perform(
+            post("/auth/delete-account")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"${session.email}","password":"password","leftData":false}"""),
+        )
+            .andExpect(status().isOk)
+
+        assert(!eventRepository.existsById(ownEvent.id))
+        assert(!eventRepository.existsById(ownedGroupEvent.id))
+        assert(eventRepository.existsById(remainingEvent.id))
+        assert(!groupRepository.existsById(ownedGroup.id))
+        assert(groupRepository.existsById(joinedGroup.id))
+        assert(groupMemberRepository.findAllByGroupId(ownedGroup.id).isEmpty())
+        assert(groupMemberRepository.findAllByUserId(session.userId).isEmpty())
+    }
+
     private fun createLoginSession(password: String, expired: Boolean = false): TestLoginSession {
         val id = UUID.randomUUID()
         val email = "test-$id@example.com"
