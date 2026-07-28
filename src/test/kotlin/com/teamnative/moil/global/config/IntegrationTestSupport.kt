@@ -1,4 +1,4 @@
-﻿package com.teamnative.moil.global.config
+package com.teamnative.moil.global.config
 
 import com.teamnative.moil.domain.auth.model.LoginSession
 import com.teamnative.moil.domain.auth.model.UserAccount
