@@ -12,6 +12,7 @@ import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import java.util.UUID
 
 @Service
 class DeleteAccountService(
@@ -31,7 +32,11 @@ class DeleteAccountService(
 
         applyCalendarDataPolicy(user, leftData)
         loginSessionRepository.deleteByUserId(user.id)
-        userAccountRepository.delete(user)
+        if (leftData) {
+            anonymizeUser(user)
+        } else {
+            userAccountRepository.delete(user)
+        }
     }
 
     private fun applyCalendarDataPolicy(user: UserAccount, leftData: Boolean) {
@@ -53,5 +58,17 @@ class DeleteAccountService(
         }
 
         groupMemberRepository.deleteByUserId(user.id)
+    }
+
+    private fun anonymizeUser(user: UserAccount) {
+        val anonymousId = UUID.randomUUID().toString()
+
+        userAccountRepository.save(
+            user.copy(
+                name = "user_$anonymousId",
+                email = "deleted_$anonymousId@deleted.local",
+                passwordHash = UUID.randomUUID().toString(),
+            ),
+        )
     }
 }

@@ -2,8 +2,10 @@ package com.teamnative.moil.global.config
 
 import com.teamnative.moil.domain.auth.model.LoginSession
 import com.teamnative.moil.domain.auth.model.UserAccount
+import com.teamnative.moil.domain.auth.model.VerifiedSignupSession
 import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
 import com.teamnative.moil.domain.auth.repository.UserAccountRepository
+import com.teamnative.moil.domain.auth.repository.VerifiedSignupSessionRepository
 import com.teamnative.moil.domain.auth.service.JwtProvider
 import com.teamnative.moil.domain.event.model.Event
 import com.teamnative.moil.domain.event.repository.EventRepository
@@ -43,6 +45,9 @@ class SecurityConfigTest {
 
     @Autowired
     private lateinit var loginSessionRepository: LoginSessionRepository
+
+    @Autowired
+    private lateinit var verifiedSignupSessionRepository: VerifiedSignupSessionRepository
 
     @Autowired
     private lateinit var groupRepository: GroupRepository
@@ -2504,6 +2509,84 @@ class SecurityConfigTest {
             .andExpect(jsonPath("$.status").value(0))
             .andExpect(jsonPath("$.message").value("회원 탈퇴가 완료되었습니다."))
             .andExpect(jsonPath("$.data").doesNotExist())
+
+        mockMvc.perform(
+            post("/auth/logout")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+    }
+
+    @Test
+    fun `delete account anonymizes user and keeps calendar data when left data is true`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "kept-group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.OWNER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val event = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "kept-event",
+            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
+            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
+        )
+
+        mockMvc.perform(
+            post("/auth/delete-account")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"${session.email}","password":"password","leftData":true}"""),
+        )
+            .andExpect(status().isOk)
+
+        val anonymizedUser = userAccountRepository.findById(session.userId).orElseThrow()
+
+        assert(anonymizedUser.name.startsWith("user_"))
+        assert(anonymizedUser.email.startsWith("deleted_"))
+        assert(anonymizedUser.email.endsWith("@deleted.local"))
+        assert(anonymizedUser.email != session.email)
+        assert(eventRepository.existsById(event.id))
+        assert(groupRepository.existsById(group.id))
+        assert(groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId) != null)
+
+        mockMvc.perform(
+            post("/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"${session.email}","password":"password"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+            .andExpect(jsonPath("$.message").value("이메일 또는 비밀번호가 일치하지 않습니다."))
+
+        val verifiedSession = verifiedSignupSessionRepository.save(
+            VerifiedSignupSession(
+                sessionId = "sess_verify_${UUID.randomUUID()}",
+                email = session.email,
+                expiresAt = Instant.now().plusSeconds(300),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/auth/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "sessionId":"${verifiedSession.sessionId}",
+                      "password":"new-password",
+                      "pwd":"new-password"
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.email").value(session.email))
 
         mockMvc.perform(
             post("/auth/logout")
