@@ -29,7 +29,7 @@ class EmailVerificationService(
 
     @Transactional
     fun sendCode(email: String): SendEmailCodeResponse {
-        val verifyId = "ver_${UUID.randomUUID()}"
+        val verifyId = UUID.randomUUID().toString()
         val code = Random.nextInt(100000, 1000000).toString()
         val expiresAt = Instant.now(clock).plusSeconds(EMAIL_CODE_TTL_SECONDS)
 
@@ -64,7 +64,7 @@ class EmailVerificationService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 코드가 일치하지 않습니다.")
         }
 
-        val sessionId = "sess_verify_${UUID.randomUUID()}"
+        val sessionId = UUID.randomUUID().toString()
         verifiedSignupSessionRepository.deleteByExpiresAtBefore(Instant.now(clock))
         verifiedSignupSessionRepository.save(
             VerifiedSignupSession(

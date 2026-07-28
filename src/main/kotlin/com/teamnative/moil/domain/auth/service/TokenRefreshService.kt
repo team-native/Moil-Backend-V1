@@ -52,7 +52,7 @@ class TokenRefreshService(
         loginSessionRepository.delete(session)
         loginSessionRepository.save(
             LoginSession(
-                sessionId = "sess_${UUID.randomUUID()}",
+                sessionId = UUID.randomUUID().toString(),
                 accessToken = newAccessToken,
                 userId = session.userId,
                 refreshToken = newRefreshToken,

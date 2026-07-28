@@ -2214,7 +2214,7 @@ class SecurityConfigTest {
         mockMvc.perform(
             post("/auth/verify-code")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"verifyId":"ver_unknown","code":"123456"}"""),
+                .content("""{"verifyId":"${UUID.randomUUID()}","code":"123456"}"""),
         )
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.success").value(false))
@@ -2228,7 +2228,7 @@ class SecurityConfigTest {
         mockMvc.perform(
             post("/auth/confirm")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"sessionId":"sess_verify_unknown","password":"password1","pwd":"password2"}"""),
+                .content("""{"sessionId":"${UUID.randomUUID()}","password":"password1","pwd":"password2"}"""),
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.success").value(false))
@@ -2242,7 +2242,7 @@ class SecurityConfigTest {
         mockMvc.perform(
             post("/auth/confirm")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"sessionId":"sess_verify_unknown","password":"password","pwd":"password"}"""),
+                .content("""{"sessionId":"${UUID.randomUUID()}","password":"password","pwd":"password"}"""),
         )
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.success").value(false))
@@ -2270,7 +2270,7 @@ class SecurityConfigTest {
         mockMvc.perform(
             post("/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"sessionId":"sess_verify_unknown","password":"password1","pwd":"password2"}"""),
+                .content("""{"sessionId":"${UUID.randomUUID()}","password":"password1","pwd":"password2"}"""),
         )
             .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.success").value(false))
@@ -2284,7 +2284,7 @@ class SecurityConfigTest {
         mockMvc.perform(
             post("/auth/reset-password")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"sessionId":"sess_verify_unknown","password":"password","pwd":"password"}"""),
+                .content("""{"sessionId":"${UUID.randomUUID()}","password":"password","pwd":"password"}"""),
         )
             .andExpect(status().isNotFound)
             .andExpect(jsonPath("$.success").value(false))
@@ -2566,7 +2566,7 @@ class SecurityConfigTest {
 
         val verifiedSession = verifiedSignupSessionRepository.save(
             VerifiedSignupSession(
-                sessionId = "sess_verify_${UUID.randomUUID()}",
+                sessionId = UUID.randomUUID().toString(),
                 email = session.email,
                 expiresAt = Instant.now().plusSeconds(300),
             ),
@@ -2694,7 +2694,7 @@ class SecurityConfigTest {
 
         loginSessionRepository.save(
             LoginSession(
-                sessionId = "sess_$id",
+                sessionId = id.toString(),
                 accessToken = accessToken,
                 userId = user.id,
                 refreshToken = refreshToken,
