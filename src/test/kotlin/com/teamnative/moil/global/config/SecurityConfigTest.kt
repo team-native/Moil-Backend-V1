@@ -2552,9 +2552,9 @@ class SecurityConfigTest {
         assert(anonymizedUser.email.startsWith("deleted_"))
         assert(anonymizedUser.email.endsWith("@deleted.local"))
         assert(anonymizedUser.email != session.email)
-        assert(eventRepository.existsById(event.id))
-        assert(groupRepository.existsById(group.id))
-        assert(groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId) != null)
+        assert(!eventRepository.existsById(event.id))
+        assert(!groupRepository.existsById(group.id))
+        assert(groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId) == null)
 
         mockMvc.perform(
             post("/auth/login")
@@ -2594,6 +2594,71 @@ class SecurityConfigTest {
         )
             .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
+    }
+
+    @Test
+    fun `delete account transfers owned group to highest ranked member when left data is true`() {
+        val ownerSession = createLoginSession(password = "password")
+        val memberSession = createLoginSession(password = "password")
+        val firstAdminSession = createLoginSession(password = "password")
+        val secondAdminSession = createLoginSession(password = "password")
+        val group = createGroup(name = "transfer-group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = ownerSession.userId,
+                role = GroupRole.OWNER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = memberSession.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = secondAdminSession.userId,
+                role = GroupRole.ADMIN,
+                joinedAt = Instant.now(),
+            ),
+        )
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = firstAdminSession.userId,
+                role = GroupRole.ADMIN,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/auth/delete-account")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${ownerSession.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"${ownerSession.email}","password":"password","leftData":true}"""),
+        )
+            .andExpect(status().isOk)
+
+        val previousOwner = groupMemberRepository.findByGroupIdAndUserId(group.id, ownerSession.userId)
+            ?: error("Previous owner member not found.")
+        val nextOwner = groupMemberRepository.findByGroupIdAndUserId(group.id, firstAdminSession.userId)
+            ?: error("Next owner member not found.")
+        val secondAdmin = groupMemberRepository.findByGroupIdAndUserId(group.id, secondAdminSession.userId)
+            ?: error("Second admin member not found.")
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, memberSession.userId)
+            ?: error("Member not found.")
+
+        assert(previousOwner.role == GroupRole.MEMBER)
+        assert(previousOwner.ownerGroupId == null)
+        assert(nextOwner.role == GroupRole.OWNER)
+        assert(nextOwner.ownerGroupId == group.id)
+        assert(secondAdmin.role == GroupRole.ADMIN)
+        assert(member.role == GroupRole.MEMBER)
     }
 
     @Test

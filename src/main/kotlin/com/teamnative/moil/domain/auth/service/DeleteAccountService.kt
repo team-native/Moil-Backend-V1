@@ -41,6 +41,7 @@ class DeleteAccountService(
 
     private fun applyCalendarDataPolicy(user: UserAccount, leftData: Boolean) {
         if (leftData) {
+            transferOwnedGroups(user)
             return
         }
 
@@ -60,6 +61,45 @@ class DeleteAccountService(
         groupMemberRepository.deleteByUserId(user.id)
     }
 
+    private fun transferOwnedGroups(user: UserAccount) {
+        val ownedMemberships = groupMemberRepository.findAllByUserId(user.id)
+            .filter { it.role == GroupRole.OWNER }
+
+        ownedMemberships.forEach { owner ->
+            val members = groupMemberRepository.findAllByGroupId(owner.groupId)
+            val nextOwner = members
+                .filter { it.userId != user.id }
+                .sortedWith(
+                    compareBy(
+                        { it.role.transferPriority() },
+                        { it.userId },
+                    ),
+                )
+                .firstOrNull()
+
+            if (nextOwner == null) {
+                eventRepository.deleteByGroupIdIn(listOf(owner.groupId))
+                groupMemberRepository.deleteByGroupIdIn(listOf(owner.groupId))
+                groupRepository.deleteAllByIdInBatch(listOf(owner.groupId))
+                return@forEach
+            }
+
+            groupMemberRepository.saveAndFlush(
+                owner.copy(
+                    role = GroupRole.MEMBER,
+                    ownerGroupId = null,
+                ),
+            )
+
+            groupMemberRepository.save(
+                nextOwner.copy(
+                    role = GroupRole.OWNER,
+                    ownerGroupId = nextOwner.groupId,
+                ),
+            )
+        }
+    }
+
     private fun anonymizeUser(user: UserAccount) {
         val anonymousId = UUID.randomUUID().toString()
 
@@ -71,4 +111,11 @@ class DeleteAccountService(
             ),
         )
     }
+
+    private fun GroupRole.transferPriority(): Int =
+        when (this) {
+            GroupRole.OWNER -> 0
+            GroupRole.ADMIN -> 1
+            GroupRole.MEMBER -> 2
+        }
 }
