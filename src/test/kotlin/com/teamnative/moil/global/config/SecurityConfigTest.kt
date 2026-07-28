@@ -1,28 +1,17 @@
 package com.teamnative.moil.global.config
 
-import com.teamnative.moil.domain.auth.model.VerifiedSignupSession
-import com.teamnative.moil.domain.event.model.Event
-import com.teamnative.moil.domain.group.model.GroupMember
-import com.teamnative.moil.domain.group.model.GroupRole
-import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-import org.springframework.http.HttpHeaders
-import org.springframework.http.MediaType
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
-import java.time.Instant
-import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class SecurityConfigTest : IntegrationTestSupport() {
 
+    @Test
     fun `health endpoint is permitted`() {
         mockMvc.perform(get("/health"))
             .andExpect(status().isOk)

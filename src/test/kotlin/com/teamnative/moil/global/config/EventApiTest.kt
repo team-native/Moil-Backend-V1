@@ -1,6 +1,5 @@
 package com.teamnative.moil.global.config
 
-import com.teamnative.moil.domain.auth.model.VerifiedSignupSession
 import com.teamnative.moil.domain.event.model.Event
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
@@ -17,12 +16,12 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
-import java.util.UUID
 
 @SpringBootTest
 @AutoConfigureMockMvc
 class EventApiTest : IntegrationTestSupport() {
 
+    @Test
     fun `group calendar requires login session`() {
         mockMvc.perform(
             get("/events/groups/1/calendar")
