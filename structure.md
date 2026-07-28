@@ -14,7 +14,6 @@ src
 │   │   │   │   │   ├── ConfirmSignupRequest.kt
 │   │   │   │   │   ├── DeleteAccountRequest.kt
 │   │   │   │   │   ├── LoginRequest.kt
-│   │   │   │   │   ├── LoginResponse.kt
 │   │   │   │   │   ├── RefreshTokenRequest.kt
 │   │   │   │   │   ├── RefreshTokenResponse.kt
 │   │   │   │   │   ├── ResetPasswordRequest.kt
