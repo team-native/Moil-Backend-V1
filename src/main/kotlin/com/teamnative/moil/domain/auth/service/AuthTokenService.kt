@@ -36,7 +36,7 @@ class AuthTokenService(
 
         loginSessionRepository.save(
             LoginSession(
-                sessionId = "sess_${UUID.randomUUID()}",
+                sessionId = UUID.randomUUID().toString(),
                 accessToken = accessToken,
                 userId = user.id,
                 refreshToken = refreshToken,
