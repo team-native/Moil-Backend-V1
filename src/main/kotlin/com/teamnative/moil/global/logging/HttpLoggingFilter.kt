@@ -48,7 +48,7 @@ class HttpLoggingFilter(
             AppLogDto(
                 level = LogLevel.INFO,
                 event = LogEvent.EXTERNAL_REQUEST,
-                message = "External request received.",
+                message = "Incoming HTTP request.",
                 traceId = traceId,
                 http = HttpLogData(
                     method = request.method,
@@ -74,7 +74,7 @@ class HttpLoggingFilter(
         val log = AppLogDto(
             level = if (status >= 500) LogLevel.ERROR else LogLevel.INFO,
             event = LogEvent.RESPONSE_RETURNED,
-            message = "Response returned.",
+            message = "HTTP response completed.",
             traceId = traceId,
             http = HttpLogData(
                 method = request.method,
@@ -108,7 +108,7 @@ class HttpLoggingFilter(
             AppLogDto(
                 level = LogLevel.ERROR,
                 event = LogEvent.ERROR_OCCURRED,
-                message = "Unhandled request error occurred.",
+                message = "Unhandled HTTP request error.",
                 traceId = traceId,
                 http = HttpLogData(
                     method = request.method,

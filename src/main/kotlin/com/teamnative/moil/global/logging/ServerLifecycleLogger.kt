@@ -19,24 +19,26 @@ class ServerLifecycleLogger(
 
     @EventListener(ApplicationReadyEvent::class)
     fun logServerStarted() {
+        val server = serverData()
         appLogger.info(
             AppLogDto(
                 level = LogLevel.INFO,
                 event = LogEvent.SERVER_STARTED,
-                message = "Server started.",
-                server = serverData(),
+                message = "Server started successfully.",
+                server = server,
             ),
         )
     }
 
     @EventListener(ContextClosedEvent::class)
     fun logServerStopped() {
+        val server = serverData()
         appLogger.info(
             AppLogDto(
                 level = LogLevel.INFO,
                 event = LogEvent.SERVER_STOPPED,
-                message = "Server stopped.",
-                server = serverData(),
+                message = "Server stopped gracefully.",
+                server = server,
             ),
         )
     }

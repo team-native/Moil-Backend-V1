@@ -103,7 +103,7 @@ class GlobalExceptionHandler(
         val log = AppLogDto(
             level = if (status.is5xxServerError) LogLevel.ERROR else LogLevel.WARN,
             event = LogEvent.ERROR_OCCURRED,
-            message = "Request error handled.",
+            message = "Handled HTTP request error.",
             traceId = request.getAttribute(HttpLoggingFilter.TRACE_ID_ATTRIBUTE) as? String,
             http = HttpLogData(
                 method = request.method,
