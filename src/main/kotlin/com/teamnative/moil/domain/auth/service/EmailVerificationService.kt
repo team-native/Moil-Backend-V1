@@ -2,14 +2,15 @@ package com.teamnative.moil.domain.auth.service
 
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeResponse
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeResponse
+import com.teamnative.moil.domain.auth.mail.VerificationEmailTemplate
 import com.teamnative.moil.domain.auth.model.EmailVerification
 import com.teamnative.moil.domain.auth.model.VerifiedSignupSession
 import com.teamnative.moil.domain.auth.repository.EmailVerificationRepository
 import com.teamnative.moil.domain.auth.repository.VerifiedSignupSessionRepository
 import com.teamnative.moil.global.config.SmtpProperties
 import org.springframework.http.HttpStatus
-import org.springframework.mail.SimpleMailMessage
 import org.springframework.mail.javamail.JavaMailSender
+import org.springframework.mail.javamail.MimeMessageHelper
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
@@ -61,7 +62,7 @@ class EmailVerificationService(
         }
 
         if (verification.code != code) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "인증 코드가 일치하지 않습니다.")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "인증번호가 일치하지 않습니다.")
         }
 
         val sessionId = UUID.randomUUID().toString()
@@ -97,14 +98,14 @@ class EmailVerificationService(
     }
 
     private fun sendMail(email: String, code: String) {
-        val message = SimpleMailMessage().apply {
-            from = smtpProperties.from.ifBlank { smtpProperties.username }
+        val mimeMessage = mailSender.createMimeMessage()
+        MimeMessageHelper(mimeMessage, false, "UTF-8").apply {
+            setFrom(smtpProperties.from.ifBlank { smtpProperties.username })
             setTo(email)
-            subject = "Moil 이메일 인증 코드"
-            text = "인증 코드는 $code 입니다. 5분 안에 입력해주세요."
+            setSubject("Moil 이메일 인증번호")
+            setText(VerificationEmailTemplate.build(code), true)
         }
-
-        mailSender.send(message)
+        mailSender.send(mimeMessage)
     }
 
     companion object {
