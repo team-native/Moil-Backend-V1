@@ -51,7 +51,7 @@ class AuthController(
     ): ApiResponse<SendEmailCodeResponse> =
         ApiResponse.success(
             message = "인증 코드가 발송되었습니다.",
-            data = emailVerificationService.sendCode(request.email),
+            data = emailVerificationService.sendCode(request.name, request.email, request.step!!),
         )
 
     @PostMapping("/verify-code")

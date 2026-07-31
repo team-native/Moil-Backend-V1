@@ -1,6 +1,7 @@
 package com.teamnative.moil.domain.auth.service
 
 import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
+import com.teamnative.moil.domain.auth.dto.EmailVerificationStep
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.auth.repository.UserAccountRepository
 import org.springframework.dao.DataIntegrityViolationException
@@ -24,7 +25,8 @@ class SignupService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "비밀번호가 일치하지 않습니다.")
         }
 
-        val email = emailVerificationService.consumeVerifiedSession(sessionId)
+        val verifiedSession = emailVerificationService.consumeVerifiedSession(sessionId, EmailVerificationStep.SIGNUP)
+        val email = verifiedSession.email
 
         if (userAccountRepository.existsByEmail(email)) {
             throw ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.")
@@ -36,7 +38,7 @@ class SignupService(
         val user = try {
             userAccountRepository.saveAndFlush(
                 UserAccount(
-                    name = email.substringBefore("@"),
+                    name = verifiedSession.name ?: email.substringBefore("@"),
                     email = email,
                     passwordHash = encodedPassword,
                 ),

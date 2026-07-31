@@ -1,14 +1,17 @@
 package com.teamnative.moil.domain.auth.service
 
+import com.teamnative.moil.domain.auth.dto.EmailVerificationStep
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeResponse
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeResponse
 import com.teamnative.moil.domain.auth.mail.VerificationEmailTemplate
 import com.teamnative.moil.domain.auth.model.EmailVerification
 import com.teamnative.moil.domain.auth.model.VerifiedSignupSession
 import com.teamnative.moil.domain.auth.repository.EmailVerificationRepository
+import com.teamnative.moil.domain.auth.repository.UserAccountRepository
 import com.teamnative.moil.domain.auth.repository.VerifiedSignupSessionRepository
 import com.teamnative.moil.global.config.SmtpProperties
 import org.springframework.http.HttpStatus
+import org.springframework.http.HttpStatusCode
 import org.springframework.mail.javamail.JavaMailSender
 import org.springframework.mail.javamail.MimeMessageHelper
 import org.springframework.stereotype.Service
@@ -25,11 +28,22 @@ class EmailVerificationService(
     private val smtpProperties: SmtpProperties,
     private val emailVerificationRepository: EmailVerificationRepository,
     private val verifiedSignupSessionRepository: VerifiedSignupSessionRepository,
+    private val userAccountRepository: UserAccountRepository,
     private val clock: Clock,
 ) {
 
     @Transactional
-    fun sendCode(email: String): SendEmailCodeResponse {
+    fun sendCode(name: String?, email: String, step: EmailVerificationStep): SendEmailCodeResponse {
+        val signupName = when (step) {
+            EmailVerificationStep.SIGNUP -> name?.trim()?.takeIf { it.isNotBlank() }
+                ?: throw ResponseStatusException(HttpStatusCode.valueOf(422), "이름을 입력하지 않았습니다.")
+            EmailVerificationStep.RESET -> null
+        }
+
+        if (step == EmailVerificationStep.SIGNUP && userAccountRepository.existsByEmail(email)) {
+            throw ResponseStatusException(HttpStatus.CONFLICT, "이미 가입된 이메일입니다.")
+        }
+
         val verifyId = UUID.randomUUID().toString()
         val code = Random.nextInt(100000, 1000000).toString()
         val expiresAt = Instant.now(clock).plusSeconds(EMAIL_CODE_TTL_SECONDS)
@@ -39,6 +53,8 @@ class EmailVerificationService(
             EmailVerification(
                 verifyId = verifyId,
                 email = email,
+                name = signupName,
+                step = step,
                 code = code,
                 expiresAt = expiresAt,
             ),
@@ -71,6 +87,8 @@ class EmailVerificationService(
             VerifiedSignupSession(
                 sessionId = sessionId,
                 email = verification.email,
+                name = verification.name,
+                step = verification.step,
                 expiresAt = Instant.now(clock).plusSeconds(VERIFIED_SESSION_TTL_SECONDS),
             ),
         )
@@ -82,20 +100,26 @@ class EmailVerificationService(
     @Transactional
     fun consumeVerifiedSession(
         sessionId: String,
+        expectedStep: EmailVerificationStep,
         notFoundMessage: String = "회원가입 세션이 없거나 만료되었습니다.",
-    ): String {
+    ): VerifiedEmailSession {
         val session = verifiedSignupSessionRepository.findById(sessionId).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, notFoundMessage)
 
-        if (session.expiresAt.isBefore(Instant.now(clock))) {
+        if (session.expiresAt.isBefore(Instant.now(clock)) || session.step != expectedStep) {
             verifiedSignupSessionRepository.delete(session)
             throw ResponseStatusException(HttpStatus.NOT_FOUND, notFoundMessage)
         }
 
         verifiedSignupSessionRepository.delete(session)
 
-        return session.email
+        return VerifiedEmailSession(email = session.email, name = session.name)
     }
+
+    data class VerifiedEmailSession(
+        val email: String,
+        val name: String?,
+    )
 
     private fun sendMail(email: String, code: String) {
         val mimeMessage = mailSender.createMimeMessage()

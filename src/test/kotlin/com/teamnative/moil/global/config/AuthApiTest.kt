@@ -1,6 +1,7 @@
 package com.teamnative.moil.global.config
 
 import com.teamnative.moil.domain.auth.model.VerifiedSignupSession
+import com.teamnative.moil.domain.auth.dto.EmailVerificationStep
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
 import org.junit.jupiter.api.Test
@@ -23,13 +24,103 @@ class AuthApiTest : IntegrationTestSupport() {
         mockMvc.perform(
             post("/auth/send-code")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"email":"user@example.com"}"""),
+                .content("""{"name":"홍길동","email":"user@example.com","step":"SIGNUP"}"""),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.success").value(true))
             .andExpect(jsonPath("$.status").value(0))
             .andExpect(jsonPath("$.message").value("인증 코드가 발송되었습니다."))
             .andExpect(jsonPath("$.data.verifyId").exists())
+    }
+
+    @Test
+    fun `signup email verification requires name`() {
+        mockMvc.perform(
+            post("/auth/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"email":"user@example.com","step":"SIGNUP"}"""),
+        )
+            .andExpect(status().`is`(422))
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(422))
+            .andExpect(jsonPath("$.message").value("이름을 입력하지 않았습니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `signup confirm uses verified signup name`() {
+        val verifiedSession = verifiedSignupSessionRepository.save(
+            VerifiedSignupSession(
+                sessionId = UUID.randomUUID().toString(),
+                email = "named-user@example.com",
+                name = "홍길동",
+                step = EmailVerificationStep.SIGNUP,
+                expiresAt = Instant.now().plusSeconds(300),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/auth/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "sessionId":"${verifiedSession.sessionId}",
+                      "password":"password",
+                      "pwd":"password"
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.name").value("홍길동"))
+            .andExpect(jsonPath("$.data.email").value("named-user@example.com"))
+    }
+
+    @Test
+    fun `signup email verification validates name length`() {
+        val longName = "가".repeat(101)
+
+        mockMvc.perform(
+            post("/auth/send-code")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"$longName","email":"user@example.com","step":"SIGNUP"}"""),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+            .andExpect(jsonPath("$.message").value("이름은 100자 이하여야 합니다."))
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `signup confirm rejects reset verification session`() {
+        val verifiedSession = verifiedSignupSessionRepository.save(
+            VerifiedSignupSession(
+                sessionId = UUID.randomUUID().toString(),
+                email = "reset-user@example.com",
+                step = EmailVerificationStep.RESET,
+                expiresAt = Instant.now().plusSeconds(300),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/auth/confirm")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "sessionId":"${verifiedSession.sessionId}",
+                      "password":"password",
+                      "pwd":"password"
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isNotFound)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(404))
+            .andExpect(jsonPath("$.data").doesNotExist())
     }
 
     @Test
@@ -391,6 +482,7 @@ class AuthApiTest : IntegrationTestSupport() {
             VerifiedSignupSession(
                 sessionId = UUID.randomUUID().toString(),
                 email = session.email,
+                step = EmailVerificationStep.SIGNUP,
                 expiresAt = Instant.now().plusSeconds(300),
             ),
         )

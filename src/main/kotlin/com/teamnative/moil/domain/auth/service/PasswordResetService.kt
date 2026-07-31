@@ -1,5 +1,6 @@
 package com.teamnative.moil.domain.auth.service
 
+import com.teamnative.moil.domain.auth.dto.EmailVerificationStep
 import com.teamnative.moil.domain.auth.repository.UserAccountRepository
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -22,8 +23,9 @@ class PasswordResetService(
 
         val email = emailVerificationService.consumeVerifiedSession(
             sessionId = sessionId,
+            expectedStep = EmailVerificationStep.RESET,
             notFoundMessage = "비밀번호 초기화 세션이 없거나 만료되었습니다.",
-        )
+        ).email
         val user = userAccountRepository.findByEmail(email)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "비밀번호 초기화 세션이 없거나 만료되었습니다.")
         val encodedPassword = passwordEncoder.encode(password)
