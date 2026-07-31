@@ -1,13 +1,13 @@
 package com.teamnative.moil.domain.group.dto
 
-import com.teamnative.moil.domain.group.model.GroupRole
-import java.time.Instant
+import com.fasterxml.jackson.annotation.JsonProperty
 
 data class GroupMemberResponse(
-    val memberId: Long,
     val userId: Long,
-    val name: String,
+    val nickname: String,
     val email: String,
-    val role: GroupRole,
-    val joinedAt: Instant,
+    val role: String,
+    val colorId: String,
+    @get:JsonProperty("isMe")
+    val isMe: Boolean,
 )

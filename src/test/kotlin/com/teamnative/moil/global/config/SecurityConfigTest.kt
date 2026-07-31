@@ -3,7 +3,9 @@ package com.teamnative.moil.global.config
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.HttpHeaders
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
@@ -24,29 +26,35 @@ class SecurityConfigTest : IntegrationTestSupport() {
     }
 
     @Test
-    fun `main api roots are available`() {
+    fun `auth root is available`() {
         mockMvc.perform(get("/auth"))
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.message").value("/auth"))
-
-        mockMvc.perform(get("/events"))
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.message").value("/events"))
     }
 
     @Test
-    fun `nested api endpoints are not available yet`() {
-        mockMvc.perform(get("/groups/me"))
-            .andExpect(status().isNotFound)
+    fun `current api endpoints require login sessions`() {
+        mockMvc.perform(post("/groups/me"))
+            .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.data").doesNotExist())
+            .andExpect(jsonPath("$.status").value(401))
 
         mockMvc.perform(get("/events/1"))
-            .andExpect(status().isNotFound)
+            .andExpect(status().isUnauthorized)
             .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.data").doesNotExist())
+            .andExpect(jsonPath("$.status").value(401))
+    }
+
+    @Test
+    fun `current api endpoints are reachable with authentication`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/groups/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
     }
 
 }

@@ -26,6 +26,8 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("com.fasterxml.jackson.datatype:jackson-datatype-jsr310")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
+    implementation("org.flywaydb:flyway-core")
+    implementation("org.flywaydb:flyway-mysql")
     implementation("io.jsonwebtoken:jjwt-api:0.13.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     runtimeOnly("io.jsonwebtoken:jjwt-impl:0.13.0")

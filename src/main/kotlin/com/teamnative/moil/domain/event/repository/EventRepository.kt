@@ -7,13 +7,23 @@ import java.time.Instant
 
 @Repository
 interface EventRepository : JpaRepository<Event, Long> {
-    fun findAllByGroupIdAndStartsAtLessThanEqualAndEndsAtGreaterThanEqual(
+    fun findAllByGroupIdAndStartsAtLessThanAndEndsAtGreaterThanEqual(
         groupId: Long,
         to: Instant,
         from: Instant,
     ): List<Event>
 
+    fun countByGroupIdAndStartsAtLessThanAndEndsAtGreaterThanEqual(
+        groupId: Long,
+        to: Instant,
+        from: Instant,
+    ): Long
+
     fun findByIdAndGroupId(id: Long, groupId: Long): Event?
+
+    fun findAllByCreatorId(creatorId: Long): List<Event>
+
+    fun findAllByGroupIdIn(groupIds: Collection<Long>): List<Event>
 
     fun deleteByCreatorId(creatorId: Long)
 

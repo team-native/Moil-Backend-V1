@@ -17,8 +17,8 @@ import java.time.Instant
 @Table(
     name = "group_members",
     uniqueConstraints = [
-        UniqueConstraint(name = "uk_group_members_group_user", columnNames = ["groupId", "userId"]),
-        UniqueConstraint(name = "uk_group_members_owner_group", columnNames = ["ownerGroupId"]),
+        UniqueConstraint(name = "uk_group_members_group_user", columnNames = ["group_id", "user_id"]),
+        UniqueConstraint(name = "uk_group_members_owner_group", columnNames = ["owner_group_id"]),
     ],
 )
 data class GroupMember(
@@ -41,6 +41,12 @@ data class GroupMember(
 
     @Column(nullable = false)
     val notificationEnabled: Boolean = true,
+
+    @Column(nullable = false, length = 10)
+    val nickname: String = "User",
+
+    @Column(nullable = false, length = 20)
+    val color: String = "RED",
 
     @Column(nullable = false)
     val joinedAt: Instant,

@@ -12,7 +12,7 @@ data class LoginSession(
     @Id
     val sessionId: String,
 
-    @Column(nullable = false, unique = true, length = 1024)
+    @Column(nullable = false, length = 1024)
     val accessToken: String,
 
     @Column(nullable = false)

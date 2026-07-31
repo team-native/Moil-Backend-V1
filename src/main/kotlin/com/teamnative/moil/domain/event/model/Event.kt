@@ -30,6 +30,9 @@ data class Event(
     @Column(nullable = true, length = 1000)
     val memo: String? = null,
 
+    @Column(nullable = true, length = 255)
+    val location: String? = null,
+
     @Column(nullable = false)
     val startsAt: Instant,
 

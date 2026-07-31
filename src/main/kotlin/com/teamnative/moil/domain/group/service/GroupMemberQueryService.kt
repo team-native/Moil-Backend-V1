@@ -27,12 +27,12 @@ class GroupMemberQueryService(
             val memberUser = users[member.userId] ?: return@mapNotNull null
 
             GroupMemberResponse(
-                memberId = member.id,
                 userId = member.userId,
-                name = memberUser.name,
+                nickname = member.nickname,
                 email = memberUser.email,
-                role = member.role,
-                joinedAt = member.joinedAt,
+                role = member.role.toApiRole(),
+                colorId = member.color,
+                isMe = member.userId == user.id,
             )
         }
     }

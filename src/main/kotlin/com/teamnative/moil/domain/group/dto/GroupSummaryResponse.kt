@@ -1,11 +1,11 @@
 package com.teamnative.moil.domain.group.dto
 
-import com.teamnative.moil.domain.group.model.GroupRole
-
 data class GroupSummaryResponse(
     val groupId: Long,
     val name: String,
-    val role: GroupRole,
+    val inviteCode: String,
+    val myRole: String,
+    val myNickname: String,
+    val myColor: String,
     val memberCount: Long,
-    val notificationEnabled: Boolean,
 )

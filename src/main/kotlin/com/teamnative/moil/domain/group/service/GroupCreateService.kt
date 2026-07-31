@@ -21,7 +21,7 @@ class GroupCreateService(
 ) {
 
     @Transactional
-    fun create(user: UserAccount, name: String): CreateGroupResponse {
+    fun create(user: UserAccount, name: String, nickname: String, color: String): CreateGroupResponse {
         val group = groupRepository.save(
             Group(
                 name = name,
@@ -37,6 +37,8 @@ class GroupCreateService(
                 ownerGroupId = group.id,
                 role = GroupRole.OWNER,
                 notificationEnabled = true,
+                nickname = nickname,
+                color = color,
                 joinedAt = Instant.now(clock),
             ),
         )
@@ -45,7 +47,7 @@ class GroupCreateService(
             groupId = group.id,
             name = group.name,
             inviteCode = group.inviteCode,
-            role = GroupRole.OWNER,
+            myRole = GroupRole.OWNER.toApiRole(),
         )
     }
 
@@ -62,3 +64,10 @@ class GroupCreateService(
         private const val INVITE_CODE_LENGTH = 12
     }
 }
+
+fun GroupRole.toApiRole(): String =
+    when (this) {
+        GroupRole.OWNER,
+        GroupRole.ADMIN -> "admin"
+        GroupRole.MEMBER -> "member"
+    }

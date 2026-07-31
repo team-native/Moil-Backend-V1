@@ -1,18 +1,22 @@
 package com.teamnative.moil.global.config
 
 import com.teamnative.moil.domain.event.model.Event
+import com.teamnative.moil.domain.event.model.EventSharedMember
+import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
@@ -21,459 +25,21 @@ import java.time.Instant
 @AutoConfigureMockMvc
 class EventApiTest : IntegrationTestSupport() {
 
-    @Test
-    fun `group calendar requires login session`() {
-        mockMvc.perform(
-            get("/events/groups/1/calendar")
-                .param("from", "2026-01-01T00:00:00Z")
-                .param("to", "2026-01-31T23:59:59Z"),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
+    @Autowired
+    private lateinit var eventSharedMemberRepository: EventSharedMemberRepository
 
     @Test
-    fun `group calendar returns not found group`() {
+    fun `group events use month query and return notion calendar keys`() {
         val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            get("/events/groups/999999/calendar")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .param("from", "2026-01-01T00:00:00Z")
-                .param("to", "2026-01-31T23:59:59Z"),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group calendar rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-
-        mockMvc.perform(
-            get("/events/groups/${group.id}/calendar")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .param("from", "2026-01-01T00:00:00Z")
-                .param("to", "2026-01-31T23:59:59Z"),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group calendar validates period format`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
+        val group = createGroup(name = "Calendar Group")
+        val otherGroup = createGroup(name = "Other Group")
         groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
                 userId = session.userId,
                 role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            get("/events/groups/${group.id}/calendar")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .param("from", "invalid")
-                .param("to", "2026-01-31T23:59:59Z"),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("기간 파라미터가 올바르지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group calendar validates period range`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            get("/events/groups/${group.id}/calendar")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .param("from", "2026-02-01T00:00:00Z")
-                .param("to", "2026-01-01T00:00:00Z"),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("조회 기간이 올바르지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group calendar returns overlapping events`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val otherGroup = createGroup(name = "다른 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-        val firstEvent = createEvent(
-            groupId = group.id,
-            userId = session.userId,
-            title = "1월 회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-        )
-        createEvent(
-            groupId = group.id,
-            userId = session.userId,
-            title = "2월 회의",
-            startsAt = Instant.parse("2026-02-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-02-10T11:00:00Z"),
-        )
-        createEvent(
-            groupId = otherGroup.id,
-            userId = session.userId,
-            title = "다른 그룹 회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-        )
-
-        mockMvc.perform(
-            get("/events/groups/${group.id}/calendar")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .param("from", "2026-01-01T00:00:00Z")
-                .param("to", "2026-01-31T23:59:59Z"),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 캘린더를 조회했습니다."))
-            .andExpect(jsonPath("$.data[0].eventId").value(firstEvent.id))
-            .andExpect(jsonPath("$.data[0].title").value("1월 회의"))
-            .andExpect(jsonPath("$.data[0].startsAt").value("2026-01-10T10:00:00Z"))
-            .andExpect(jsonPath("$.data[0].endsAt").value("2026-01-10T11:00:00Z"))
-            .andExpect(jsonPath("$.data[1]").doesNotExist())
-    }
-
-    @Test
-    fun `create group event requires login session`() {
-        mockMvc.perform(
-            post("/events/groups/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {"title":"회의","startsAt":"2026-01-10T10:00:00Z","endsAt":"2026-01-10T11:00:00Z"}
-                    """.trimIndent(),
-                ),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `create group event validates required fields`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/events/groups/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"","startsAt":"2026-01-10T10:00:00Z","endsAt":"2026-01-10T11:00:00Z"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("일정 제목을 입력해주세요."))
-
-        mockMvc.perform(
-            post("/events/groups/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"회의","startsAt":"","endsAt":"2026-01-10T11:00:00Z"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("시작 시간을 입력해주세요."))
-
-        mockMvc.perform(
-            post("/events/groups/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"회의","startsAt":"2026-01-10T10:00:00Z","endsAt":""}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("종료 시간을 입력해주세요."))
-    }
-
-    @Test
-    fun `create group event validates content length`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/events/groups/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "title":"${"가".repeat(101)}",
-                      "startsAt":"2026-01-10T10:00:00Z",
-                      "endsAt":"2026-01-10T11:00:00Z"
-                    }
-                    """.trimIndent(),
-                ),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("일정 제목은 100자 이하로 입력해주세요."))
-
-        mockMvc.perform(
-            post("/events/groups/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "title":"회의",
-                      "memo":"${"가".repeat(1001)}",
-                      "startsAt":"2026-01-10T10:00:00Z",
-                      "endsAt":"2026-01-10T11:00:00Z"
-                    }
-                    """.trimIndent(),
-                ),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("일정 메모는 1000자 이하로 입력해주세요."))
-    }
-
-    @Test
-    fun `create group event returns not found group`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/events/groups/999999")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"회의","startsAt":"2026-01-10T10:00:00Z","endsAt":"2026-01-10T11:00:00Z"}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `create group event rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-
-        mockMvc.perform(
-            post("/events/groups/${group.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"회의","startsAt":"2026-01-10T10:00:00Z","endsAt":"2026-01-10T11:00:00Z"}"""),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `create group event validates event time format`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/events/groups/${group.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"회의","startsAt":"invalid","endsAt":"2026-01-10T11:00:00Z"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("일정 시간 형식이 올바르지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `create group event validates event time range`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/events/groups/${group.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"회의","startsAt":"2026-01-10T11:00:00Z","endsAt":"2026-01-10T10:00:00Z"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("일정 시간 범위가 올바르지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `create group event saves event`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/events/groups/${group.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(
-                    """
-                    {
-                      "title":"회의",
-                      "memo":"안건 정리",
-                      "startsAt":"2026-01-10T10:00:00Z",
-                      "endsAt":"2026-01-10T11:00:00Z"
-                    }
-                    """.trimIndent(),
-                ),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 일정이 추가되었습니다."))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.title").value("회의"))
-            .andExpect(jsonPath("$.data.memo").value("안건 정리"))
-            .andExpect(jsonPath("$.data.startsAt").value("2026-01-10T10:00:00Z"))
-            .andExpect(jsonPath("$.data.endsAt").value("2026-01-10T11:00:00Z"))
-            .andExpect(jsonPath("$.data.creatorId").value(session.userId))
-            .andExpect(jsonPath("$.data.updaterId").value(session.userId))
-    }
-
-    @Test
-    fun `group event requires login session`() {
-        mockMvc.perform(get("/events/groups/1/1"))
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group event returns not found group`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            get("/events/groups/999999/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group event rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val event = createEvent(
-            groupId = group.id,
-            userId = session.userId,
-            title = "회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-        )
-
-        mockMvc.perform(
-            get("/events/groups/${group.id}/${event.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group event returns not found event`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            get("/events/groups/${group.id}/999999")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("일정을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group event returns event detail`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val otherGroup = createGroup(name = "다른 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
+                nickname = "Member",
+                color = "GREEN",
                 joinedAt = Instant.now(),
             ),
         )
@@ -482,402 +48,233 @@ class EventApiTest : IntegrationTestSupport() {
                 groupId = group.id,
                 creatorId = session.userId,
                 updaterId = session.userId,
-                title = "회의",
-                memo = "안건 정리",
-                startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-                endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-                createdAt = Instant.parse("2026-01-01T00:00:00Z"),
-                updatedAt = Instant.parse("2026-01-02T00:00:00Z"),
+                title = "Team Sync",
+                location = "Room A",
+                startsAt = Instant.parse("2026-01-10T01:00:00Z"),
+                endsAt = Instant.parse("2026-01-10T02:00:00Z"),
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+            ),
+        )
+        eventSharedMemberRepository.save(
+            EventSharedMember(
+                eventId = event.id,
+                userId = session.userId,
+                createdAt = Instant.now(),
             ),
         )
         createEvent(
             groupId = otherGroup.id,
             userId = session.userId,
-            title = "다른 그룹 회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
+            title = "Other Event",
+            startsAt = Instant.parse("2026-01-10T01:00:00Z"),
+            endsAt = Instant.parse("2026-01-10T02:00:00Z"),
         )
 
         mockMvc.perform(
-            get("/events/groups/${group.id}/${event.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+            get("/groups/${group.id}/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .param("month", "2026-01"),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 일정을 조회했습니다."))
-            .andExpect(jsonPath("$.data.eventId").value(event.id))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.title").value("회의"))
-            .andExpect(jsonPath("$.data.memo").value("안건 정리"))
-            .andExpect(jsonPath("$.data.startsAt").value("2026-01-10T10:00:00Z"))
-            .andExpect(jsonPath("$.data.endsAt").value("2026-01-10T11:00:00Z"))
-            .andExpect(jsonPath("$.data.creatorId").value(session.userId))
-            .andExpect(jsonPath("$.data.updaterId").value(session.userId))
-            .andExpect(jsonPath("$.data.createdAt").value("2026-01-01T00:00:00Z"))
-            .andExpect(jsonPath("$.data.updatedAt").value("2026-01-02T00:00:00Z"))
+            .andExpect(jsonPath("$.data[0].eventId").value(event.id))
+            .andExpect(jsonPath("$.data[0].title").value("Team Sync"))
+            .andExpect(jsonPath("$.data[0].date").value("2026-01-10"))
+            .andExpect(jsonPath("$.data[0].isAllDay").value(false))
+            .andExpect(jsonPath("$.data[0].startTime").value("10:00"))
+            .andExpect(jsonPath("$.data[0].endTime").value("11:00"))
+            .andExpect(jsonPath("$.data[0].location").value("Room A"))
+            .andExpect(jsonPath("$.data[0].members[0].userId").value(session.userId))
+            .andExpect(jsonPath("$.data[0].members[0].nickname").value("Member"))
+            .andExpect(jsonPath("$.data[0].members[0].colorId").value("GREEN"))
+            .andExpect(jsonPath("$.data[0].startsAt").doesNotExist())
+            .andExpect(jsonPath("$.data[0].endsAt").doesNotExist())
+            .andExpect(jsonPath("$.data[1]").doesNotExist())
     }
 
     @Test
-    fun `update group event requires login session`() {
-        mockMvc.perform(
-            put("/events/groups/1/1")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"수정 회의","startsAt":"2026-01-10T12:00:00Z","endsAt":"2026-01-10T13:00:00Z"}"""),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group event validates required fields`() {
+    fun `create event accepts notion request keys and returns eventId only`() {
         val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            put("/events/groups/1/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"","startsAt":"2026-01-10T12:00:00Z","endsAt":"2026-01-10T13:00:00Z"}"""),
+        val group = createGroup(name = "Create Event Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Member",
+                color = "BLUE",
+                joinedAt = Instant.now(),
+            ),
         )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("일정 제목을 입력해주세요."))
 
         mockMvc.perform(
-            put("/events/groups/1/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"수정 회의","startsAt":"","endsAt":"2026-01-10T13:00:00Z"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("시작 시간을 입력해주세요."))
-
-        mockMvc.perform(
-            put("/events/groups/1/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"수정 회의","startsAt":"2026-01-10T12:00:00Z","endsAt":""}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("종료 시간을 입력해주세요."))
-    }
-
-    @Test
-    fun `update group event validates content length`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            put("/events/groups/1/1")
+            post("/events")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
                     {
-                      "title":"${"가".repeat(101)}",
-                      "startsAt":"2026-01-10T12:00:00Z",
-                      "endsAt":"2026-01-10T13:00:00Z"
+                      "groupId":${group.id},
+                      "title":"Planning",
+                      "date":"2026-02-03",
+                      "isAllDay":false,
+                      "startTime":"09:30",
+                      "endTime":"10:30",
+                      "location":"Room B",
+                      "sharedMemberIds":[${session.userId}]
                     }
                     """.trimIndent(),
                 ),
         )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("일정 제목은 100자 이하로 입력해주세요."))
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.eventId").exists())
+            .andExpect(jsonPath("$.data.groupId").doesNotExist())
+            .andExpect(jsonPath("$.data.startsAt").doesNotExist())
+            .andExpect(jsonPath("$.data.memo").doesNotExist())
+
+        val event = eventRepository.findAll().first { it.title == "Planning" }
+        val shares = eventSharedMemberRepository.findAllByEventId(event.id)
+
+        assertEquals(group.id, event.groupId)
+        assertEquals("Room B", event.location)
+        assertEquals(listOf(session.userId), shares.map { it.userId })
+    }
+
+    @Test
+    fun `create event requires shared members`() {
+        val session = createLoginSession(password = "password")
 
         mockMvc.perform(
-            put("/events/groups/1/1")
+            post("/events")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
                     {
-                      "title":"수정 회의",
-                      "memo":"${"가".repeat(1001)}",
-                      "startsAt":"2026-01-10T12:00:00Z",
-                      "endsAt":"2026-01-10T13:00:00Z"
+                      "groupId":1,
+                      "title":"Planning",
+                      "date":"2026-02-03",
+                      "isAllDay":true,
+                      "sharedMemberIds":[]
                     }
                     """.trimIndent(),
                 ),
         )
             .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.message").value("일정 메모는 1000자 이하로 입력해주세요."))
-    }
-
-    @Test
-    fun `update group event returns not found group`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            put("/events/groups/999999/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"수정 회의","startsAt":"2026-01-10T12:00:00Z","endsAt":"2026-01-10T13:00:00Z"}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group event rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val event = createEvent(
-            groupId = group.id,
-            userId = session.userId,
-            title = "회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-        )
-
-        mockMvc.perform(
-            put("/events/groups/${group.id}/${event.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"수정 회의","startsAt":"2026-01-10T12:00:00Z","endsAt":"2026-01-10T13:00:00Z"}"""),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group event returns not found event`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            put("/events/groups/${group.id}/999999")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"수정 회의","startsAt":"2026-01-10T12:00:00Z","endsAt":"2026-01-10T13:00:00Z"}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("일정을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group event validates event time format`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-        val event = createEvent(
-            groupId = group.id,
-            userId = session.userId,
-            title = "회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-        )
-
-        mockMvc.perform(
-            put("/events/groups/${group.id}/${event.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"수정 회의","startsAt":"invalid","endsAt":"2026-01-10T13:00:00Z"}"""),
-        )
-            .andExpect(status().isBadRequest)
             .andExpect(jsonPath("$.success").value(false))
             .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("일정 시간 형식이 올바르지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
     }
 
     @Test
-    fun `update group event validates event time range`() {
+    fun `event detail returns notion response keys`() {
         val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
+        val group = createGroup(name = "Detail Event Group")
         groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
                 userId = session.userId,
                 role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-        val event = createEvent(
-            groupId = group.id,
-            userId = session.userId,
-            title = "회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-        )
-
-        mockMvc.perform(
-            put("/events/groups/${group.id}/${event.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"title":"수정 회의","startsAt":"2026-01-10T13:00:00Z","endsAt":"2026-01-10T12:00:00Z"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("일정 시간 범위가 올바르지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group event saves event changes`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
+                nickname = "Member",
+                color = "YELLOW",
                 joinedAt = Instant.now(),
             ),
         )
         val event = eventRepository.save(
             Event(
                 groupId = group.id,
-                creatorId = 999999,
-                updaterId = 999999,
-                title = "회의",
-                memo = "기존 메모",
-                startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-                endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-                createdAt = Instant.parse("2026-01-01T00:00:00Z"),
-                updatedAt = Instant.parse("2026-01-02T00:00:00Z"),
+                creatorId = session.userId,
+                updaterId = session.userId,
+                title = "All Day",
+                location = "Online",
+                startsAt = Instant.parse("2026-03-01T15:00:00Z"),
+                endsAt = Instant.parse("2026-03-02T15:00:00Z"),
+                createdAt = Instant.now(),
+                updatedAt = Instant.now(),
+            ),
+        )
+        eventSharedMemberRepository.save(
+            EventSharedMember(
+                eventId = event.id,
+                userId = session.userId,
+                createdAt = Instant.now(),
             ),
         )
 
         mockMvc.perform(
-            put("/events/groups/${group.id}/${event.id}")
+            get("/events/${event.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.eventId").value(event.id))
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.title").value("All Day"))
+            .andExpect(jsonPath("$.data.date").value("2026-03-02"))
+            .andExpect(jsonPath("$.data.isAllDay").value(true))
+            .andExpect(jsonPath("$.data.startTime").doesNotExist())
+            .andExpect(jsonPath("$.data.endTime").doesNotExist())
+            .andExpect(jsonPath("$.data.location").value("Online"))
+            .andExpect(jsonPath("$.data.members[0].colorId").value("YELLOW"))
+            .andExpect(jsonPath("$.data.memo").doesNotExist())
+            .andExpect(jsonPath("$.data.creatorId").doesNotExist())
+            .andExpect(jsonPath("$.data.startsAt").doesNotExist())
+    }
+
+    @Test
+    fun `update event uses patch and returns null data`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Update Event Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Member",
+                color = "GREEN",
+                joinedAt = Instant.now(),
+            ),
+        )
+        val event = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "Before",
+            startsAt = Instant.parse("2026-04-01T01:00:00Z"),
+            endsAt = Instant.parse("2026-04-01T02:00:00Z"),
+        )
+
+        mockMvc.perform(
+            patch("/events/${event.id}")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(
                     """
                     {
-                      "title":"수정 회의",
-                      "memo":"수정 메모",
-                      "startsAt":"2026-01-10T12:00:00Z",
-                      "endsAt":"2026-01-10T13:00:00Z"
+                      "title":"After",
+                      "date":"2026-04-02",
+                      "isAllDay":false,
+                      "startTime":"13:00",
+                      "endTime":"14:00",
+                      "location":"Room C",
+                      "sharedMemberIds":[${session.userId}]
                     }
                     """.trimIndent(),
                 ),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 일정이 수정되었습니다."))
-            .andExpect(jsonPath("$.data.eventId").value(event.id))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.title").value("수정 회의"))
-            .andExpect(jsonPath("$.data.memo").value("수정 메모"))
-            .andExpect(jsonPath("$.data.startsAt").value("2026-01-10T12:00:00Z"))
-            .andExpect(jsonPath("$.data.endsAt").value("2026-01-10T13:00:00Z"))
-            .andExpect(jsonPath("$.data.creatorId").value(999999))
-            .andExpect(jsonPath("$.data.updaterId").value(session.userId))
-            .andExpect(jsonPath("$.data.createdAt").value("2026-01-01T00:00:00Z"))
+            .andExpect(jsonPath("$.data").doesNotExist())
 
-        val updatedEvent = eventRepository.findByIdAndGroupId(event.id, group.id)
-            ?: error("Updated event was not saved.")
-        assertEquals("수정 회의", updatedEvent.title)
-        assertEquals("수정 메모", updatedEvent.memo)
+        val updatedEvent = eventRepository.findById(event.id).orElseThrow()
+        val shares = eventSharedMemberRepository.findAllByEventId(event.id)
+
+        assertEquals("After", updatedEvent.title)
+        assertEquals("Room C", updatedEvent.location)
         assertEquals(session.userId, updatedEvent.updaterId)
-        assertEquals(Instant.parse("2026-01-10T12:00:00Z"), updatedEvent.startsAt)
-        assertEquals(Instant.parse("2026-01-10T13:00:00Z"), updatedEvent.endsAt)
+        assertEquals(listOf(session.userId), shares.map { it.userId })
     }
 
     @Test
-    fun `delete group event requires login session`() {
-        mockMvc.perform(delete("/events/groups/1/1"))
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `delete group event returns not found group`() {
+    fun `delete event uses notion path and clears shared members`() {
         val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            delete("/events/groups/999999/1")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `delete group event rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val event = createEvent(
-            groupId = group.id,
-            userId = session.userId,
-            title = "회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
-        )
-
-        mockMvc.perform(
-            delete("/events/groups/${group.id}/${event.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `delete group event returns not found event`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            delete("/events/groups/${group.id}/999999")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("일정을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `delete group event removes event`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
+        val group = createGroup(name = "Delete Event Group")
         groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
@@ -889,27 +286,26 @@ class EventApiTest : IntegrationTestSupport() {
         val event = createEvent(
             groupId = group.id,
             userId = session.userId,
-            title = "회의",
-            startsAt = Instant.parse("2026-01-10T10:00:00Z"),
-            endsAt = Instant.parse("2026-01-10T11:00:00Z"),
+            title = "Delete Me",
+            startsAt = Instant.parse("2026-05-01T01:00:00Z"),
+            endsAt = Instant.parse("2026-05-01T02:00:00Z"),
+        )
+        eventSharedMemberRepository.save(
+            EventSharedMember(
+                eventId = event.id,
+                userId = session.userId,
+                createdAt = Instant.now(),
+            ),
         )
 
         mockMvc.perform(
-            delete("/events/groups/${group.id}/${event.id}")
+            delete("/events/${event.id}")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 일정이 삭제되었습니다."))
             .andExpect(jsonPath("$.data").doesNotExist())
 
-        mockMvc.perform(
-            get("/events/groups/${group.id}/${event.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.message").value("일정을 찾을 수 없습니다."))
+        assertFalse(eventRepository.existsById(event.id))
+        assertEquals(emptyList<EventSharedMember>(), eventSharedMemberRepository.findAllByEventId(event.id))
     }
-
 }

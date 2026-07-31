@@ -2,12 +2,16 @@ package com.teamnative.moil.global.config
 
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -19,277 +23,176 @@ import java.util.UUID
 class GroupApiTest : IntegrationTestSupport() {
 
     @Test
-    fun `my groups requires login session`() {
-        mockMvc.perform(get("/groups"))
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `my groups returns joined group list`() {
+    fun `my groups returns notion response keys`() {
         val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
+        val group = createGroup(name = "Spec Group")
         groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
                 userId = session.userId,
                 role = GroupRole.OWNER,
-                notificationEnabled = false,
+                nickname = "Owner",
+                color = "RED",
                 joinedAt = Instant.now(),
             ),
         )
 
         mockMvc.perform(
-            get("/groups")
+            post("/groups/me")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("내 그룹 목록을 조회했습니다."))
             .andExpect(jsonPath("$.data[0].groupId").value(group.id))
-            .andExpect(jsonPath("$.data[0].name").value("스터디 그룹"))
-            .andExpect(jsonPath("$.data[0].role").value("OWNER"))
+            .andExpect(jsonPath("$.data[0].name").value("Spec Group"))
+            .andExpect(jsonPath("$.data[0].inviteCode").value(group.inviteCode))
+            .andExpect(jsonPath("$.data[0].myRole").value("admin"))
+            .andExpect(jsonPath("$.data[0].myNickname").value("Owner"))
+            .andExpect(jsonPath("$.data[0].myColor").value("RED"))
             .andExpect(jsonPath("$.data[0].memberCount").value(1))
-            .andExpect(jsonPath("$.data[0].notificationEnabled").value(false))
+            .andExpect(jsonPath("$.data[0].role").doesNotExist())
+            .andExpect(jsonPath("$.data[0].notificationEnabled").doesNotExist())
     }
 
     @Test
-    fun `group detail requires login session`() {
-        mockMvc.perform(get("/groups/1"))
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group detail returns not found`() {
+    fun `create group accepts profile keys and returns notion response keys`() {
         val session = createLoginSession(password = "password")
+        val groupName = "Spec Group ${UUID.randomUUID()}"
 
         mockMvc.perform(
-            get("/groups/999999")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group detail rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-
-        mockMvc.perform(
-            get("/groups/${group.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group detail returns group information`() {
-        val session = createLoginSession(password = "password")
-        val otherSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.saveAll(
-            listOf(
-                GroupMember(
-                    groupId = group.id,
-                    userId = session.userId,
-                    role = GroupRole.ADMIN,
-                    notificationEnabled = false,
-                    joinedAt = Instant.now(),
-                ),
-                GroupMember(
-                    groupId = group.id,
-                    userId = otherSession.userId,
-                    role = GroupRole.MEMBER,
-                    joinedAt = Instant.now(),
-                ),
-            ),
-        )
-
-        mockMvc.perform(
-            get("/groups/${group.id}")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+            post("/groups")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"$groupName","nickname":"Moil","color":"BLUE"}"""),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 정보를 조회했습니다."))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.name").value("스터디 그룹"))
-            .andExpect(jsonPath("$.data.inviteCode").value(group.inviteCode))
-            .andExpect(jsonPath("$.data.role").value("ADMIN"))
-            .andExpect(jsonPath("$.data.memberCount").value(2))
-            .andExpect(jsonPath("$.data.notificationEnabled").value(false))
+            .andExpect(jsonPath("$.data.groupId").exists())
+            .andExpect(jsonPath("$.data.name").value(groupName))
+            .andExpect(jsonPath("$.data.inviteCode").exists())
+            .andExpect(jsonPath("$.data.myRole").value("admin"))
+            .andExpect(jsonPath("$.data.role").doesNotExist())
+
+        val group = groupRepository.findAll().first { it.name == groupName }
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Created owner member not found.")
+
+        assertEquals(GroupRole.OWNER, member.role)
+        assertEquals("Moil", member.nickname)
+        assertEquals("BLUE", member.color)
     }
 
     @Test
-    fun `group members requires login session`() {
-        mockMvc.perform(get("/groups/1/members"))
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group members returns not found`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            get("/groups/999999/members")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group members rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-
-        mockMvc.perform(
-            get("/groups/${group.id}/members")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `group members returns member list`() {
+    fun `join verify and join use notion paths and keys`() {
         val ownerSession = createLoginSession(password = "password")
-        val memberSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val ownerMember = groupMemberRepository.save(
+        val joinSession = createLoginSession(password = "password")
+        val group = createGroup(name = "Joinable Group")
+        groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
                 userId = ownerSession.userId,
                 role = GroupRole.OWNER,
-                joinedAt = Instant.now().minusSeconds(10),
-            ),
-        )
-        val member = groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = memberSession.userId,
-                role = GroupRole.MEMBER,
+                nickname = "Owner",
+                color = "RED",
                 joinedAt = Instant.now(),
             ),
         )
+
+        mockMvc.perform(
+            post("/groups/join/verify")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${joinSession.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"${group.inviteCode}"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.name").value("Joinable Group"))
+            .andExpect(jsonPath("$.data.memberCount").value(1))
+            .andExpect(jsonPath("$.data.inviteCode").value(group.inviteCode))
+
+        mockMvc.perform(
+            post("/groups/join")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${joinSession.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"${group.inviteCode}","nickname":"Guest","color":"GREEN"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.name").value("Joinable Group"))
+            .andExpect(jsonPath("$.data.myRole").value("member"))
+            .andExpect(jsonPath("$.data.myNickname").value("Guest"))
+            .andExpect(jsonPath("$.data.myColor").value("GREEN"))
+            .andExpect(jsonPath("$.data.memberCount").doesNotExist())
+
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, joinSession.userId)
+            ?: error("Joined member not found.")
+
+        assertEquals(GroupRole.MEMBER, member.role)
+        assertEquals("Guest", member.nickname)
+        assertEquals("GREEN", member.color)
+    }
+
+    @Test
+    fun `group detail and members return notion response keys`() {
+        val ownerSession = createLoginSession(password = "password")
+        val memberSession = createLoginSession(password = "password")
+        val group = createGroup(name = "Detail Group")
+        groupMemberRepository.saveAll(
+            listOf(
+                GroupMember(
+                    groupId = group.id,
+                    userId = ownerSession.userId,
+                    role = GroupRole.OWNER,
+                    nickname = "Owner",
+                    color = "RED",
+                    joinedAt = Instant.now().minusSeconds(10),
+                ),
+                GroupMember(
+                    groupId = group.id,
+                    userId = memberSession.userId,
+                    role = GroupRole.MEMBER,
+                    nickname = "Member",
+                    color = "GREEN",
+                    joinedAt = Instant.now(),
+                ),
+            ),
+        )
+
+        mockMvc.perform(
+            get("/groups/${group.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${ownerSession.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.name").value("Detail Group"))
+            .andExpect(jsonPath("$.data.inviteCode").value(group.inviteCode))
+            .andExpect(jsonPath("$.data.memberCount").value(2))
+            .andExpect(jsonPath("$.data.monthlyEventCount").isNumber)
+            .andExpect(jsonPath("$.data.myRole").value("admin"))
+            .andExpect(jsonPath("$.data.members[0].userId").value(ownerSession.userId))
+            .andExpect(jsonPath("$.data.members[0].nickname").value("Owner"))
+            .andExpect(jsonPath("$.data.members[0].role").value("admin"))
+            .andExpect(jsonPath("$.data.members[0].color").value("RED"))
+            .andExpect(jsonPath("$.data.role").doesNotExist())
+            .andExpect(jsonPath("$.data.notificationEnabled").doesNotExist())
 
         mockMvc.perform(
             get("/groups/${group.id}/members")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${ownerSession.accessToken}"),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 멤버 목록을 조회했습니다."))
-            .andExpect(jsonPath("$.data[0].memberId").value(ownerMember.id))
             .andExpect(jsonPath("$.data[0].userId").value(ownerSession.userId))
-            .andExpect(jsonPath("$.data[0].name").value("test-user"))
+            .andExpect(jsonPath("$.data[0].nickname").value("Owner"))
             .andExpect(jsonPath("$.data[0].email").value(ownerSession.email))
-            .andExpect(jsonPath("$.data[0].role").value("OWNER"))
-            .andExpect(jsonPath("$.data[0].joinedAt").exists())
-            .andExpect(jsonPath("$.data[1].memberId").value(member.id))
-            .andExpect(jsonPath("$.data[1].userId").value(memberSession.userId))
-            .andExpect(jsonPath("$.data[1].email").value(memberSession.email))
-            .andExpect(jsonPath("$.data[1].role").value("MEMBER"))
+            .andExpect(jsonPath("$.data[0].role").value("admin"))
+            .andExpect(jsonPath("$.data[0].colorId").value("RED"))
+            .andExpect(jsonPath("$.data[0].isMe").value(true))
+            .andExpect(jsonPath("$.data[0].memberId").doesNotExist())
+            .andExpect(jsonPath("$.data[0].joinedAt").doesNotExist())
     }
 
     @Test
-    fun `update group notification requires login session`() {
-        mockMvc.perform(
-            post("/groups/1/notification")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"notificationEnabled":false}"""),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group notification requires setting value`() {
+    fun `notification update uses enabled request key`() {
         val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/1/notification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("알림 설정 여부를 입력해주세요."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group notification returns not found`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/999999/notification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"notificationEnabled":false}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group notification rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-
-        mockMvc.perform(
-            post("/groups/${group.id}/notification")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"notificationEnabled":false}"""),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group notification changes member setting`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
+        val group = createGroup(name = "Notification Group")
         groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
@@ -301,206 +204,33 @@ class GroupApiTest : IntegrationTestSupport() {
         )
 
         mockMvc.perform(
-            post("/groups/${group.id}/notification")
+            patch("/groups/${group.id}/notification")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"notificationEnabled":false}"""),
+                .content("""{"enabled":false}"""),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 알림 설정이 변경되었습니다."))
             .andExpect(jsonPath("$.data.groupId").value(group.id))
             .andExpect(jsonPath("$.data.notificationEnabled").value(false))
 
         val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
             ?: error("Group member not found.")
 
-        assert(!member.notificationEnabled)
+        assertEquals(false, member.notificationEnabled)
     }
 
     @Test
-    fun `update group name requires login session`() {
-        mockMvc.perform(
-            post("/groups/1/name")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":"새 그룹"}"""),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group name validates name`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/1/name")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":""}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("그룹 이름을 입력해주세요."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group name returns not found`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/999999/name")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":"새 그룹"}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group name rejects member role`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/name")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":"새 그룹"}"""),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 권한이 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group name changes group name`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.ADMIN,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/name")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":"새 그룹"}"""),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 이름이 변경되었습니다."))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.name").value("새 그룹"))
-
-        val updatedGroup = groupRepository.findById(group.id).orElseThrow()
-
-        assert(updatedGroup.name == "새 그룹")
-    }
-
-    @Test
-    fun `update group member role requires login session`() {
-        mockMvc.perform(
-            post("/groups/1/members/1/role")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"role":"ADMIN"}"""),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group member role requires role`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/1/members/1/role")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("변경할 권한을 입력해주세요."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group member role rejects invalid role`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/1/members/1/role")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"role":"UNKNOWN"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("요청 형식이 올바르지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group member role returns not found group`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/999999/members/1/role")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"role":"ADMIN"}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group member role rejects member role`() {
-        val managerSession = createLoginSession(password = "password")
+    fun `management endpoints return null data and mutate state`() {
+        val ownerSession = createLoginSession(password = "password")
         val targetSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
+        val group = createGroup(name = "Management Group")
         groupMemberRepository.saveAll(
             listOf(
                 GroupMember(
                     groupId = group.id,
-                    userId = managerSession.userId,
-                    role = GroupRole.MEMBER,
-                    joinedAt = Instant.now(),
+                    userId = ownerSession.userId,
+                    role = GroupRole.OWNER,
+                    joinedAt = Instant.now().minusSeconds(10),
                 ),
                 GroupMember(
                     groupId = group.id,
@@ -510,391 +240,49 @@ class GroupApiTest : IntegrationTestSupport() {
                 ),
             ),
         )
-        val targetMember = groupMemberRepository.findByGroupIdAndUserId(group.id, targetSession.userId)
-            ?: error("Target member not found.")
 
         mockMvc.perform(
-            post("/groups/${group.id}/members/${targetMember.id}/role")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${managerSession.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"role":"ADMIN"}"""),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 권한이 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group member role returns not found target member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.ADMIN,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/members/999999/role")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"role":"ADMIN"}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("대상 멤버를 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group member role rejects owner role request`() {
-        val session = createLoginSession(password = "password")
-        val targetSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.ADMIN,
-                joinedAt = Instant.now(),
-            ),
-        )
-        val targetMember = groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = targetSession.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/members/${targetMember.id}/role")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"role":"OWNER"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("OWNER 권한은 양도 API를 사용해주세요."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group member role rejects target owner`() {
-        val session = createLoginSession(password = "password")
-        val ownerSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.ADMIN,
-                joinedAt = Instant.now(),
-            ),
-        )
-        val ownerMember = groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = ownerSession.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/members/${ownerMember.id}/role")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"role":"ADMIN"}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("OWNER 권한은 변경할 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `update group member role changes target role`() {
-        val session = createLoginSession(password = "password")
-        val targetSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-        val targetMember = groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = targetSession.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/members/${targetMember.id}/role")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"role":"ADMIN"}"""),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 멤버 권한이 변경되었습니다."))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.memberId").value(targetMember.id))
-            .andExpect(jsonPath("$.data.role").value("ADMIN"))
-
-        val updatedMember = groupMemberRepository.findById(targetMember.id).orElseThrow()
-
-        assert(updatedMember.role == GroupRole.ADMIN)
-    }
-
-    @Test
-    fun `transfer group owner requires login session`() {
-        mockMvc.perform(
-            post("/groups/1/owner")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"memberId":1}"""),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `transfer group owner requires target member`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/1/owner")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("대상 멤버를 입력해주세요."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `transfer group owner rejects non owner`() {
-        val session = createLoginSession(password = "password")
-        val targetSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val targetMember = groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = targetSession.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.ADMIN,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/owner")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"memberId":${targetMember.id}}"""),
-        )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 권한이 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `transfer group owner returns not found target member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/owner")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"memberId":999999}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("대상 멤버를 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `transfer group owner rejects current owner target`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val ownerMember = groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/owner")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"memberId":${ownerMember.id}}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("이미 그룹 관리자입니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `transfer group owner changes owner role`() {
-        val ownerSession = createLoginSession(password = "password")
-        val targetSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        val ownerMember = groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = ownerSession.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-        val targetMember = groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = targetSession.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/owner")
+            patch("/groups/${group.id}")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${ownerSession.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"memberId":${targetMember.id}}"""),
+                .content("""{"name":"Renamed Group"}"""),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹 관리자 권한이 양도되었습니다."))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.previousOwnerMemberId").value(ownerMember.id))
-            .andExpect(jsonPath("$.data.previousOwnerRole").value("ADMIN"))
-            .andExpect(jsonPath("$.data.newOwnerMemberId").value(targetMember.id))
-            .andExpect(jsonPath("$.data.newOwnerRole").value("OWNER"))
-
-        val previousOwner = groupMemberRepository.findById(ownerMember.id).orElseThrow()
-        val newOwner = groupMemberRepository.findById(targetMember.id).orElseThrow()
-
-        assert(previousOwner.role == GroupRole.ADMIN)
-        assert(newOwner.role == GroupRole.OWNER)
-    }
-
-    @Test
-    fun `leave group requires login session`() {
-        mockMvc.perform(post("/groups/1/leave"))
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
             .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `leave group returns not found`() {
-        val session = createLoginSession(password = "password")
 
         mockMvc.perform(
-            post("/groups/999999/leave")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+            patch("/groups/${group.id}/members")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${ownerSession.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"members":[{"userId":${targetSession.userId},"role":"admin"}]}"""),
         )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("그룹을 찾을 수 없습니다."))
+            .andExpect(status().isOk)
             .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `leave group rejects non member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
 
         mockMvc.perform(
-            post("/groups/${group.id}/leave")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+            post("/groups/${group.id}/transfer-admin")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${ownerSession.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"targetUserId":${targetSession.userId}}"""),
         )
-            .andExpect(status().isForbidden)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(403))
-            .andExpect(jsonPath("$.message").value("그룹 멤버가 아닙니다."))
+            .andExpect(status().isOk)
             .andExpect(jsonPath("$.data").doesNotExist())
+
+        assertEquals("Renamed Group", groupRepository.findById(group.id).orElseThrow().name)
+        assertEquals(
+            GroupRole.ADMIN,
+            groupMemberRepository.findByGroupIdAndUserId(group.id, ownerSession.userId)?.role,
+        )
+        assertEquals(
+            GroupRole.OWNER,
+            groupMemberRepository.findByGroupIdAndUserId(group.id, targetSession.userId)?.role,
+        )
     }
 
     @Test
-    fun `leave group rejects owner`() {
+    fun `leave group uses notion path and returns null data`() {
         val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/${group.id}/leave")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("OWNER는 권한 양도 후 퇴장할 수 있습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `leave group removes member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
+        val group = createGroup(name = "Leave Group")
         groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
@@ -905,317 +293,12 @@ class GroupApiTest : IntegrationTestSupport() {
         )
 
         mockMvc.perform(
-            post("/groups/${group.id}/leave")
+            delete("/groups/${group.id}/members/me")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹에서 퇴장했습니다."))
             .andExpect(jsonPath("$.data").doesNotExist())
 
-        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
-
-        assert(member == null)
+        assertNull(groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId))
     }
-
-    @Test
-    fun `create group requires login session`() {
-        mockMvc.perform(
-            post("/groups")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":"스터디 그룹"}"""),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `create group validates name`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":""}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("그룹 이름을 입력해주세요."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `create group registers owner member`() {
-        val session = createLoginSession(password = "password")
-        val groupName = "스터디 그룹-${UUID.randomUUID()}"
-
-        mockMvc.perform(
-            post("/groups")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":"$groupName"}"""),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹이 생성되었습니다."))
-            .andExpect(jsonPath("$.data.groupId").exists())
-            .andExpect(jsonPath("$.data.name").value(groupName))
-            .andExpect(jsonPath("$.data.inviteCode").exists())
-            .andExpect(jsonPath("$.data.role").value("OWNER"))
-
-        val group = groupRepository.findAll().first { it.name == groupName }
-        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
-            ?: error("Created owner member not found.")
-
-        assert(member.role == GroupRole.OWNER)
-        assert(member.ownerGroupId == group.id)
-    }
-
-    @Test
-    fun `group member syncs owner group id from role`() {
-        val ownerSession = createLoginSession(password = "password")
-        val memberSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-
-        val ownerMember = groupMemberRepository.saveAndFlush(
-            GroupMember(
-                groupId = group.id,
-                userId = ownerSession.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-        val member = groupMemberRepository.saveAndFlush(
-            GroupMember(
-                groupId = group.id,
-                userId = memberSession.userId,
-                ownerGroupId = group.id,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        assert(ownerMember.ownerGroupId == group.id)
-        assert(member.ownerGroupId == null)
-    }
-
-    @Test
-    fun `check group invite requires invite code`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/invite/check")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":""}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("초대 코드를 입력해주세요."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `check group invite requires login session`() {
-        mockMvc.perform(
-            post("/groups/invite/check")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"invite-code"}"""),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `check group invite returns not found`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/invite/check")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"unknown"}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("초대 코드를 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `check group invite rejects already joined member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/invite/check")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"${group.inviteCode}"}"""),
-        )
-            .andExpect(status().isConflict)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(409))
-            .andExpect(jsonPath("$.message").value("이미 참가한 그룹입니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `check group invite returns group information`() {
-        val session = createLoginSession(password = "password")
-        val otherSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = otherSession.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/invite/check")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"${group.inviteCode}"}"""),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("참가 가능한 그룹입니다."))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.name").value("스터디 그룹"))
-            .andExpect(jsonPath("$.data.memberCount").value(1))
-    }
-
-    @Test
-    fun `join group requires login session`() {
-        mockMvc.perform(
-            post("/groups/join")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"invite-code"}"""),
-        )
-            .andExpect(status().isUnauthorized)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(401))
-            .andExpect(jsonPath("$.message").value("로그인되어 있지 않습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `join group requires invite code`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/join")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":""}"""),
-        )
-            .andExpect(status().isBadRequest)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(400))
-            .andExpect(jsonPath("$.message").value("초대 코드를 입력해주세요."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `join group returns not found`() {
-        val session = createLoginSession(password = "password")
-
-        mockMvc.perform(
-            post("/groups/join")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"unknown"}"""),
-        )
-            .andExpect(status().isNotFound)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(404))
-            .andExpect(jsonPath("$.message").value("초대 코드를 찾을 수 없습니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `join group rejects already joined member`() {
-        val session = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = session.userId,
-                role = GroupRole.MEMBER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/join")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"${group.inviteCode}"}"""),
-        )
-            .andExpect(status().isConflict)
-            .andExpect(jsonPath("$.success").value(false))
-            .andExpect(jsonPath("$.status").value(409))
-            .andExpect(jsonPath("$.message").value("이미 참가한 그룹입니다."))
-            .andExpect(jsonPath("$.data").doesNotExist())
-    }
-
-    @Test
-    fun `join group registers member`() {
-        val session = createLoginSession(password = "password")
-        val ownerSession = createLoginSession(password = "password")
-        val group = createGroup(name = "스터디 그룹")
-        groupMemberRepository.save(
-            GroupMember(
-                groupId = group.id,
-                userId = ownerSession.userId,
-                role = GroupRole.OWNER,
-                joinedAt = Instant.now(),
-            ),
-        )
-
-        mockMvc.perform(
-            post("/groups/join")
-                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"${group.inviteCode}"}"""),
-        )
-            .andExpect(status().isOk)
-            .andExpect(jsonPath("$.success").value(true))
-            .andExpect(jsonPath("$.status").value(0))
-            .andExpect(jsonPath("$.message").value("그룹에 참가했습니다."))
-            .andExpect(jsonPath("$.data.groupId").value(group.id))
-            .andExpect(jsonPath("$.data.name").value("스터디 그룹"))
-            .andExpect(jsonPath("$.data.role").value("MEMBER"))
-            .andExpect(jsonPath("$.data.memberCount").value(2))
-
-        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
-            ?: error("Joined member not found.")
-
-        assert(member.role == GroupRole.MEMBER)
-    }
-
 }

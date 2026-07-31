@@ -5,4 +5,6 @@ import jakarta.validation.constraints.NotBlank
 data class JoinGroupRequest(
     @field:NotBlank(message = "초대 코드를 입력해주세요.")
     val inviteCode: String,
+    val nickname: String? = null,
+    val color: String? = null,
 )

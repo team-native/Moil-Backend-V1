@@ -1,18 +1,27 @@
 package com.teamnative.moil.domain.group.service
 
 import com.teamnative.moil.domain.auth.model.UserAccount
+import com.teamnative.moil.domain.auth.repository.UserAccountRepository
+import com.teamnative.moil.domain.event.repository.EventRepository
+import com.teamnative.moil.domain.group.dto.GroupDetailMemberResponse
 import com.teamnative.moil.domain.group.dto.GroupDetailResponse
 import com.teamnative.moil.domain.group.dto.GroupSummaryResponse
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.time.Clock
+import java.time.YearMonth
+import java.time.ZoneId
 
 @Service
 class GroupQueryService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val groupPermissionService: GroupPermissionService,
+    private val userAccountRepository: UserAccountRepository,
+    private val eventRepository: EventRepository,
+    private val clock: Clock,
 ) {
 
     @Transactional(readOnly = true)
@@ -27,9 +36,11 @@ class GroupQueryService(
             GroupSummaryResponse(
                 groupId = group.id,
                 name = group.name,
-                role = member.role,
+                inviteCode = group.inviteCode,
+                myRole = member.role.toApiRole(),
+                myNickname = member.nickname,
+                myColor = member.color,
                 memberCount = groupMemberRepository.countByGroupId(group.id),
-                notificationEnabled = member.notificationEnabled,
             )
         }
     }
@@ -37,14 +48,33 @@ class GroupQueryService(
     @Transactional(readOnly = true)
     fun findGroup(user: UserAccount, groupId: Long): GroupDetailResponse {
         val access = groupPermissionService.requireMember(user, groupId)
+        val members = groupMemberRepository.findAllByGroupId(groupId).sortedBy { it.joinedAt }
+        val users = userAccountRepository.findAllById(members.map { it.userId }).associateBy { it.id }
+        val zone = ZoneId.of("Asia/Seoul")
+        val currentMonth = YearMonth.now(clock.withZone(zone))
+        val monthStart = currentMonth.atDay(1).atStartOfDay(zone).toInstant()
+        val nextMonthStart = currentMonth.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant()
 
         return GroupDetailResponse(
             groupId = access.group.id,
             name = access.group.name,
             inviteCode = access.group.inviteCode,
-            role = access.member.role,
             memberCount = groupMemberRepository.countByGroupId(access.group.id),
-            notificationEnabled = access.member.notificationEnabled,
+            monthlyEventCount = eventRepository.countByGroupIdAndStartsAtLessThanAndEndsAtGreaterThanEqual(
+                groupId = access.group.id,
+                to = nextMonthStart,
+                from = monthStart,
+            ),
+            myRole = access.member.role.toApiRole(),
+            members = members.mapNotNull { member ->
+                val memberUser = users[member.userId] ?: return@mapNotNull null
+                GroupDetailMemberResponse(
+                    userId = member.userId,
+                    nickname = member.nickname,
+                    role = member.role.toApiRole(),
+                    color = member.color,
+                )
+            },
         )
     }
 }

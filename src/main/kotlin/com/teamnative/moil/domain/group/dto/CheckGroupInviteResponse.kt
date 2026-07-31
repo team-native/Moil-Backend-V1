@@ -4,4 +4,5 @@ data class CheckGroupInviteResponse(
     val groupId: Long,
     val name: String,
     val memberCount: Long,
+    val inviteCode: String,
 )

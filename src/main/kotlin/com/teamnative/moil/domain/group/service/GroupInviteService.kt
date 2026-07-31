@@ -31,11 +31,12 @@ class GroupInviteService(
             groupId = group.id,
             name = group.name,
             memberCount = groupMemberRepository.countByGroupId(group.id),
+            inviteCode = group.inviteCode,
         )
     }
 
     @Transactional
-    fun join(user: UserAccount, inviteCode: String): JoinGroupResponse {
+    fun join(user: UserAccount, inviteCode: String, nickname: String, color: String): JoinGroupResponse {
         val group = findJoinableGroup(user, inviteCode)
 
         try {
@@ -45,6 +46,8 @@ class GroupInviteService(
                     userId = user.id,
                     role = GroupRole.MEMBER,
                     notificationEnabled = true,
+                    nickname = nickname,
+                    color = color,
                     joinedAt = Instant.now(clock),
                 ),
             )
@@ -55,8 +58,9 @@ class GroupInviteService(
         return JoinGroupResponse(
             groupId = group.id,
             name = group.name,
-            role = GroupRole.MEMBER,
-            memberCount = groupMemberRepository.countByGroupId(group.id),
+            myRole = GroupRole.MEMBER.toApiRole(),
+            myNickname = nickname,
+            myColor = color,
         )
     }
 
