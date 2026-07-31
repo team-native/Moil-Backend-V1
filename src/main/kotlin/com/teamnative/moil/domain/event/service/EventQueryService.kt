@@ -33,7 +33,7 @@ class EventQueryService(
         val yearMonth = try {
             YearMonth.parse(month)
         } catch (exception: DateTimeParseException) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "湲곌컙 ?뚮씪誘명꽣媛 ?щ컮瑜댁? ?딆뒿?덈떎.")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "월 파라미터 형식이 올바르지 않습니다.")
         }
         val zone = ZoneId.of("Asia/Seoul")
         val from = yearMonth.atDay(1).atStartOfDay(zone).toInstant()
@@ -67,7 +67,7 @@ class EventQueryService(
     @Transactional(readOnly = true)
     fun findEvent(user: UserAccount, eventId: Long): EventDetailResponse {
         val event = eventRepository.findById(eventId).orElse(null)
-            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "?쇱젙??李얠쓣 ???놁뒿?덈떎.")
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다.")
 
         groupPermissionService.requireMember(user, event.groupId)
 
@@ -88,7 +88,7 @@ class EventQueryService(
         try {
             Instant.parse(this)
         } catch (exception: DateTimeParseException) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "기간 파라미터가 올바르지 않습니다.")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "기간 파라미터 형식이 올바르지 않습니다.")
         }
 
     private fun Event.toDetailResponse(): EventDetailResponse =
