@@ -62,7 +62,7 @@ class GroupApiTest : IntegrationTestSupport() {
             post("/groups")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"name":"$groupName","nickname":"Moil","color":"BLUE"}"""),
+                .content("""{"name":"$groupName","nickname":"Moil","colorId":"BLUE"}"""),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.groupId").exists())
@@ -112,7 +112,7 @@ class GroupApiTest : IntegrationTestSupport() {
             post("/groups/join")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${joinSession.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("""{"inviteCode":"${group.inviteCode}","nickname":"Guest","color":"GREEN"}"""),
+                .content("""{"inviteCode":"${group.inviteCode}","nickname":"Guest","colorId":"GREEN"}"""),
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.groupId").value(group.id))

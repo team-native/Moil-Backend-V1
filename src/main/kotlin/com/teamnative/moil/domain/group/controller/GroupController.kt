@@ -70,7 +70,7 @@ class GroupController(
     ): ApiResponse<CreateGroupResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)
         val nickname = requireNickname(request.nickname)
-        val color = requireColor(request.color)
+        val color = requireColor(request.colorId)
 
         return ApiResponse.success(
             message = "그룹을 생성했습니다.",
@@ -98,7 +98,7 @@ class GroupController(
     ): ApiResponse<JoinGroupResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)
         val nickname = requireNickname(request.nickname)
-        val color = requireColor(request.color)
+        val color = requireColor(request.colorId)
 
         return ApiResponse.success(
             message = "그룹에 참여했습니다.",

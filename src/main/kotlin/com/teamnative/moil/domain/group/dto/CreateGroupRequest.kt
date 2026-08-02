@@ -6,5 +6,5 @@ data class CreateGroupRequest(
     @field:NotBlank(message = "그룹 이름을 입력해주세요.")
     val name: String,
     val nickname: String? = null,
-    val color: String? = null,
+    val colorId: String? = null,
 )
