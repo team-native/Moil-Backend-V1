@@ -32,6 +32,10 @@ moil:
 
 server:
   port: 6500
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
 
 management:
   endpoints:
