@@ -8,8 +8,10 @@ import com.teamnative.moil.domain.group.dto.GroupDetailResponse
 import com.teamnative.moil.domain.group.dto.GroupSummaryResponse
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.YearMonth
 import java.time.ZoneId
@@ -18,7 +20,6 @@ import java.time.ZoneId
 class GroupQueryService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
-    private val groupPermissionService: GroupPermissionService,
     private val userAccountRepository: UserAccountRepository,
     private val eventRepository: EventRepository,
     private val clock: Clock,
@@ -47,7 +48,9 @@ class GroupQueryService(
 
     @Transactional(readOnly = true)
     fun findGroup(user: UserAccount, groupId: Long): GroupDetailResponse {
-        val access = groupPermissionService.requireMember(user, groupId)
+        val group = groupRepository.findById(groupId).orElse(null)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "洹몃９??李얠쓣 ???놁뒿?덈떎.")
+        val currentUserMember = groupMemberRepository.findByGroupIdAndUserId(groupId, user.id)
         val members = groupMemberRepository.findAllByGroupId(groupId).sortedBy { it.joinedAt }
         val users = userAccountRepository.findAllById(members.map { it.userId }).associateBy { it.id }
         val zone = ZoneId.of("Asia/Seoul")
@@ -56,16 +59,16 @@ class GroupQueryService(
         val nextMonthStart = currentMonth.plusMonths(1).atDay(1).atStartOfDay(zone).toInstant()
 
         return GroupDetailResponse(
-            groupId = access.group.id,
-            name = access.group.name,
-            inviteCode = access.group.inviteCode,
-            memberCount = groupMemberRepository.countByGroupId(access.group.id),
+            groupId = group.id,
+            name = group.name,
+            inviteCode = group.inviteCode,
+            memberCount = groupMemberRepository.countByGroupId(group.id),
             monthlyEventCount = eventRepository.countByGroupIdAndStartsAtLessThanAndEndsAtGreaterThanEqual(
-                groupId = access.group.id,
+                groupId = group.id,
                 to = nextMonthStart,
                 from = monthStart,
             ),
-            myRole = access.member.role.toApiRole(),
+            myRole = currentUserMember?.role?.toApiRole(),
             members = members.mapNotNull { member ->
                 val memberUser = users[member.userId] ?: return@mapNotNull null
                 GroupDetailMemberResponse(

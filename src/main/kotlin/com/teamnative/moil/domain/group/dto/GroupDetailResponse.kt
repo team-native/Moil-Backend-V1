@@ -6,7 +6,7 @@ data class GroupDetailResponse(
     val inviteCode: String,
     val memberCount: Long,
     val monthlyEventCount: Long,
-    val myRole: String,
+    val myRole: String?,
     val members: List<GroupDetailMemberResponse>,
 )
 

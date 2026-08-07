@@ -190,6 +190,36 @@ class GroupApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `group detail allows logged in non member before joining`() {
+        val ownerSession = createLoginSession(password = "password")
+        val nonMemberSession = createLoginSession(password = "password")
+        val group = createGroup(name = "Invite Preview Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = ownerSession.userId,
+                role = GroupRole.OWNER,
+                nickname = "Owner",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            get("/groups/${group.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${nonMemberSession.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.name").value("Invite Preview Group"))
+            .andExpect(jsonPath("$.data.inviteCode").value(group.inviteCode))
+            .andExpect(jsonPath("$.data.memberCount").value(1))
+            .andExpect(jsonPath("$.data.myRole").doesNotExist())
+            .andExpect(jsonPath("$.data.members[0].userId").value(ownerSession.userId))
+            .andExpect(jsonPath("$.data.members[0].nickname").value("Owner"))
+    }
+
+    @Test
     fun `notification update uses enabled request key`() {
         val session = createLoginSession(password = "password")
         val group = createGroup(name = "Notification Group")
