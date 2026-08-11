@@ -1,10 +1,13 @@
 package com.teamnative.moil.global.config
 
+import com.teamnative.moil.domain.event.model.EventSharedMember
+import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
+import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
@@ -21,6 +24,9 @@ import java.util.UUID
 @SpringBootTest
 @AutoConfigureMockMvc
 class GroupApiTest : IntegrationTestSupport() {
+
+    @Autowired
+    private lateinit var eventSharedMemberRepository: EventSharedMemberRepository
 
     @Test
     fun `my groups returns notion response keys`() {
@@ -313,12 +319,41 @@ class GroupApiTest : IntegrationTestSupport() {
     fun `leave group uses notion path and returns null data`() {
         val session = createLoginSession(password = "password")
         val group = createGroup(name = "Leave Group")
+        val otherGroup = createGroup(name = "Other Group")
+        val groupEvent = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "Leave Target Event",
+            startsAt = Instant.now().plusSeconds(3600),
+            endsAt = Instant.now().plusSeconds(7200),
+        )
+        val otherGroupEvent = createEvent(
+            groupId = otherGroup.id,
+            userId = session.userId,
+            title = "Other Group Event",
+            startsAt = Instant.now().plusSeconds(3600),
+            endsAt = Instant.now().plusSeconds(7200),
+        )
         groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
                 userId = session.userId,
                 role = GroupRole.MEMBER,
                 joinedAt = Instant.now(),
+            ),
+        )
+        eventSharedMemberRepository.saveAll(
+            listOf(
+                EventSharedMember(
+                    eventId = groupEvent.id,
+                    userId = session.userId,
+                    createdAt = Instant.now(),
+                ),
+                EventSharedMember(
+                    eventId = otherGroupEvent.id,
+                    userId = session.userId,
+                    createdAt = Instant.now(),
+                ),
             ),
         )
 
@@ -330,5 +365,7 @@ class GroupApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data").doesNotExist())
 
         assertNull(groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId))
+        assertEquals(emptyList<EventSharedMember>(), eventSharedMemberRepository.findAllByEventId(groupEvent.id))
+        assertEquals(1, eventSharedMemberRepository.findAllByEventId(otherGroupEvent.id).size)
     }
 }

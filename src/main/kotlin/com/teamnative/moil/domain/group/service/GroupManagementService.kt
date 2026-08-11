@@ -1,6 +1,7 @@
 package com.teamnative.moil.domain.group.service
 
 import com.teamnative.moil.domain.auth.model.UserAccount
+import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.model.GroupRole
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
@@ -14,6 +15,7 @@ class GroupManagementService(
     private val groupPermissionService: GroupPermissionService,
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val eventSharedMemberRepository: EventSharedMemberRepository,
 ) {
 
     @Transactional
@@ -105,6 +107,7 @@ class GroupManagementService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "OWNER cannot leave a group.")
         }
 
+        eventSharedMemberRepository.deleteByUserIdAndGroupId(user.id, groupId)
         groupMemberRepository.delete(access.member)
     }
 }
