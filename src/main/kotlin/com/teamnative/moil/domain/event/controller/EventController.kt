@@ -43,10 +43,10 @@ class EventController(
             groupId = request.groupId!!,
             title = request.title,
             date = request.date,
-            isAllDay = request.isAllDay!!,
             startTime = request.startTime,
             endTime = request.endTime,
             location = request.location,
+            memo = request.memo,
             sharedMemberIds = request.sharedMemberIds,
         )
 
@@ -84,10 +84,10 @@ class EventController(
             eventId = eventId,
             title = request.title,
             date = request.date,
-            isAllDay = request.isAllDay!!,
             startTime = request.startTime,
             endTime = request.endTime,
             location = request.location,
+            memo = request.memo,
             sharedMemberIds = request.sharedMemberIds,
         )
 

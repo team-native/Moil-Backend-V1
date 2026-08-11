@@ -49,6 +49,7 @@ class EventApiTest : IntegrationTestSupport() {
                 creatorId = session.userId,
                 updaterId = session.userId,
                 title = "Team Sync",
+                memo = "Weekly planning",
                 location = "Room A",
                 startsAt = Instant.parse("2026-01-10T01:00:00Z"),
                 endsAt = Instant.parse("2026-01-10T02:00:00Z"),
@@ -80,10 +81,11 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data[0].eventId").value(event.id))
             .andExpect(jsonPath("$.data[0].title").value("Team Sync"))
             .andExpect(jsonPath("$.data[0].date").value("2026-01-10"))
-            .andExpect(jsonPath("$.data[0].isAllDay").value(false))
+            .andExpect(jsonPath("$.data[0].isAllDay").doesNotExist())
             .andExpect(jsonPath("$.data[0].startTime").value("10:00"))
             .andExpect(jsonPath("$.data[0].endTime").value("11:00"))
             .andExpect(jsonPath("$.data[0].location").value("Room A"))
+            .andExpect(jsonPath("$.data[0].memo").value("Weekly planning"))
             .andExpect(jsonPath("$.data[0].members[0].userId").value(session.userId))
             .andExpect(jsonPath("$.data[0].members[0].nickname").value("Member"))
             .andExpect(jsonPath("$.data[0].members[0].colorId").value("GREEN"))
@@ -117,10 +119,10 @@ class EventApiTest : IntegrationTestSupport() {
                       "groupId":${group.id},
                       "title":"Planning",
                       "date":"2026-02-03",
-                      "isAllDay":false,
                       "startTime":"09:30",
                       "endTime":"10:30",
                       "location":"Room B",
+                      "memo":"Bring agenda",
                       "sharedMemberIds":[${session.userId}]
                     }
                     """.trimIndent(),
@@ -130,14 +132,53 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data.eventId").exists())
             .andExpect(jsonPath("$.data.groupId").doesNotExist())
             .andExpect(jsonPath("$.data.startsAt").doesNotExist())
-            .andExpect(jsonPath("$.data.memo").doesNotExist())
 
         val event = eventRepository.findAll().first { it.title == "Planning" }
         val shares = eventSharedMemberRepository.findAllByEventId(event.id)
 
         assertEquals(group.id, event.groupId)
         assertEquals("Room B", event.location)
+        assertEquals("Bring agenda", event.memo)
         assertEquals(listOf(session.userId), shares.map { it.userId })
+    }
+
+    @Test
+    fun `create event stores null memo when request memo is blank`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Create Blank Memo Event Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "groupId":${group.id},
+                      "title":"Planning",
+                      "date":"2026-02-03",
+                      "startTime":"09:30",
+                      "endTime":"10:30",
+                      "location":"Room B",
+                      "memo":"",
+                      "sharedMemberIds":[${session.userId}]
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isOk)
+
+        val event = eventRepository.findAll().first { it.title == "Planning" && it.groupId == group.id }
+
+        assertEquals(null, event.memo)
     }
 
     @Test
@@ -154,7 +195,6 @@ class EventApiTest : IntegrationTestSupport() {
                       "groupId":1,
                       "title":"Planning",
                       "date":"2026-02-03",
-                      "isAllDay":true,
                       "sharedMemberIds":[]
                     }
                     """.trimIndent(),
@@ -185,6 +225,7 @@ class EventApiTest : IntegrationTestSupport() {
                 creatorId = session.userId,
                 updaterId = session.userId,
                 title = "All Day",
+                memo = "Remote friendly",
                 location = "Online",
                 startsAt = Instant.parse("2026-03-01T15:00:00Z"),
                 endsAt = Instant.parse("2026-03-02T15:00:00Z"),
@@ -209,12 +250,12 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data.groupId").value(group.id))
             .andExpect(jsonPath("$.data.title").value("All Day"))
             .andExpect(jsonPath("$.data.date").value("2026-03-02"))
-            .andExpect(jsonPath("$.data.isAllDay").value(true))
+            .andExpect(jsonPath("$.data.isAllDay").doesNotExist())
             .andExpect(jsonPath("$.data.startTime").doesNotExist())
             .andExpect(jsonPath("$.data.endTime").doesNotExist())
             .andExpect(jsonPath("$.data.location").value("Online"))
+            .andExpect(jsonPath("$.data.memo").value("Remote friendly"))
             .andExpect(jsonPath("$.data.members[0].colorId").value("YELLOW"))
-            .andExpect(jsonPath("$.data.memo").doesNotExist())
             .andExpect(jsonPath("$.data.creatorId").doesNotExist())
             .andExpect(jsonPath("$.data.startsAt").doesNotExist())
     }
@@ -239,7 +280,8 @@ class EventApiTest : IntegrationTestSupport() {
             title = "Before",
             startsAt = Instant.parse("2026-04-01T01:00:00Z"),
             endsAt = Instant.parse("2026-04-01T02:00:00Z"),
-        )
+        ).copy(memo = "Before memo")
+            .let { eventRepository.save(it) }
 
         mockMvc.perform(
             patch("/events/${event.id}")
@@ -250,10 +292,10 @@ class EventApiTest : IntegrationTestSupport() {
                     {
                       "title":"After",
                       "date":"2026-04-02",
-                      "isAllDay":false,
                       "startTime":"13:00",
                       "endTime":"14:00",
                       "location":"Room C",
+                      "memo":"Updated memo",
                       "sharedMemberIds":[${session.userId}]
                     }
                     """.trimIndent(),
@@ -267,8 +309,55 @@ class EventApiTest : IntegrationTestSupport() {
 
         assertEquals("After", updatedEvent.title)
         assertEquals("Room C", updatedEvent.location)
+        assertEquals("Updated memo", updatedEvent.memo)
         assertEquals(session.userId, updatedEvent.updaterId)
         assertEquals(listOf(session.userId), shares.map { it.userId })
+    }
+
+    @Test
+    fun `update event clears memo when request memo is blank`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Clear Memo Event Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val event = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "Before",
+            startsAt = Instant.parse("2026-04-01T01:00:00Z"),
+            endsAt = Instant.parse("2026-04-01T02:00:00Z"),
+        ).copy(memo = "Existing memo")
+            .let { eventRepository.save(it) }
+
+        mockMvc.perform(
+            patch("/events/${event.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title":"After",
+                      "date":"2026-04-02",
+                      "startTime":"13:00",
+                      "endTime":"14:00",
+                      "location":"Room C",
+                      "memo":"",
+                      "sharedMemberIds":[${session.userId}]
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isOk)
+
+        val updatedEvent = eventRepository.findById(event.id).orElseThrow()
+
+        assertEquals(null, updatedEvent.memo)
     }
 
     @Test

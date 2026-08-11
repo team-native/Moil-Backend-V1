@@ -1,6 +1,5 @@
 package com.teamnative.moil.domain.event.dto
 
-import com.fasterxml.jackson.annotation.JsonProperty
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
@@ -16,13 +15,10 @@ data class CreateEventRequest(
     @field:NotBlank(message = "일정 날짜를 입력해주세요.")
     val date: String,
 
-    @field:NotNull(message = "종일 여부를 입력해주세요.")
-    @get:JsonProperty("isAllDay")
-    @param:JsonProperty("isAllDay")
-    val isAllDay: Boolean?,
-
     val startTime: String? = null,
     val endTime: String? = null,
     val location: String? = null,
+    @field:Size(max = 1000, message = "일정 메모는 1000자 이하로 입력해주세요.")
+    val memo: String? = null,
     val sharedMemberIds: List<Long> = emptyList(),
 )

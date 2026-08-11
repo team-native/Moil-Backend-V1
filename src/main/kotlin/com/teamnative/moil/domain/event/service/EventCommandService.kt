@@ -33,18 +33,18 @@ class EventCommandService(
         groupId: Long,
         title: String,
         date: String,
-        isAllDay: Boolean,
         startTime: String?,
         endTime: String?,
         location: String?,
+        memo: String?,
         sharedMemberIds: List<Long>,
     ): Long {
-        val range = toRange(date, isAllDay, startTime, endTime)
+        val range = toRange(date, startTime, endTime)
         val eventId = create(
             user = user,
             groupId = groupId,
             title = title,
-            memo = null,
+            memo = memo?.ifBlank { null },
             location = location,
             startsAt = range.first.toString(),
             endsAt = range.second.toString(),
@@ -95,22 +95,22 @@ class EventCommandService(
         eventId: Long,
         title: String,
         date: String,
-        isAllDay: Boolean,
         startTime: String?,
         endTime: String?,
         location: String?,
+        memo: String?,
         sharedMemberIds: List<Long>,
     ) {
         val event = eventRepository.findById(eventId).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found.")
-        val range = toRange(date, isAllDay, startTime, endTime)
+        val range = toRange(date, startTime, endTime)
 
         update(
             user = user,
             groupId = event.groupId,
             eventId = eventId,
             title = title,
-            memo = event.memo,
+            memo = memo?.ifBlank { null },
             location = location,
             startsAt = range.first.toString(),
             endsAt = range.second.toString(),
@@ -198,7 +198,6 @@ class EventCommandService(
 
     private fun toRange(
         date: String,
-        isAllDay: Boolean,
         startTime: String?,
         endTime: String?,
     ): Pair<Instant, Instant> {
@@ -209,7 +208,7 @@ class EventCommandService(
         }
         val zone = ZoneId.of("Asia/Seoul")
 
-        if (isAllDay) {
+        if (startTime == null && endTime == null) {
             return day.atStartOfDay(zone).toInstant() to day.plusDays(1).atStartOfDay(zone).toInstant()
         }
 
