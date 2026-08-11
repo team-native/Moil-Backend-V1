@@ -18,6 +18,7 @@ data class CreateEventRequest(
     val startTime: String? = null,
     val endTime: String? = null,
     val location: String? = null,
+    @field:Size(max = 1000, message = "일정 메모는 1000자 이하로 입력해주세요.")
     val memo: String? = null,
     val sharedMemberIds: List<Long> = emptyList(),
 )
