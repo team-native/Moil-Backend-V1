@@ -18,5 +18,6 @@ data class CreateEventRequest(
     val startTime: String? = null,
     val endTime: String? = null,
     val location: String? = null,
+    val memo: String? = null,
     val sharedMemberIds: List<Long> = emptyList(),
 )

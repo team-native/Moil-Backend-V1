@@ -101,6 +101,7 @@ class EventQueryService(
                 startTime = calendar.startTime,
                 endTime = calendar.endTime,
                 location = calendar.location,
+                memo = calendar.memo,
                 members = calendar.members,
             )
         }
@@ -123,6 +124,7 @@ class EventQueryService(
             startTime = if (isAllDay) null else start.toLocalTime().toString(),
             endTime = if (isAllDay) null else end.toLocalTime().toString(),
             location = location,
+            memo = memo,
             members = eventMembers(id, groupId).ifEmpty {
                 listOf(
                     EventMemberResponse(

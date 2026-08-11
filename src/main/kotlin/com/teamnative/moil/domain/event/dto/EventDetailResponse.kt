@@ -8,6 +8,7 @@ data class EventDetailResponse(
     val startTime: String?,
     val endTime: String?,
     val location: String?,
+    val memo: String?,
     val members: List<EventMemberResponse>,
 )
 

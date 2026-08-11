@@ -46,6 +46,7 @@ class EventController(
             startTime = request.startTime,
             endTime = request.endTime,
             location = request.location,
+            memo = request.memo,
             sharedMemberIds = request.sharedMemberIds,
         )
 
@@ -86,6 +87,7 @@ class EventController(
             startTime = request.startTime,
             endTime = request.endTime,
             location = request.location,
+            memo = request.memo,
             sharedMemberIds = request.sharedMemberIds,
         )
 

@@ -49,6 +49,7 @@ class EventApiTest : IntegrationTestSupport() {
                 creatorId = session.userId,
                 updaterId = session.userId,
                 title = "Team Sync",
+                memo = "Weekly planning",
                 location = "Room A",
                 startsAt = Instant.parse("2026-01-10T01:00:00Z"),
                 endsAt = Instant.parse("2026-01-10T02:00:00Z"),
@@ -84,6 +85,7 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data[0].startTime").value("10:00"))
             .andExpect(jsonPath("$.data[0].endTime").value("11:00"))
             .andExpect(jsonPath("$.data[0].location").value("Room A"))
+            .andExpect(jsonPath("$.data[0].memo").value("Weekly planning"))
             .andExpect(jsonPath("$.data[0].members[0].userId").value(session.userId))
             .andExpect(jsonPath("$.data[0].members[0].nickname").value("Member"))
             .andExpect(jsonPath("$.data[0].members[0].colorId").value("GREEN"))
@@ -120,6 +122,7 @@ class EventApiTest : IntegrationTestSupport() {
                       "startTime":"09:30",
                       "endTime":"10:30",
                       "location":"Room B",
+                      "memo":"Bring agenda",
                       "sharedMemberIds":[${session.userId}]
                     }
                     """.trimIndent(),
@@ -129,13 +132,13 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data.eventId").exists())
             .andExpect(jsonPath("$.data.groupId").doesNotExist())
             .andExpect(jsonPath("$.data.startsAt").doesNotExist())
-            .andExpect(jsonPath("$.data.memo").doesNotExist())
 
         val event = eventRepository.findAll().first { it.title == "Planning" }
         val shares = eventSharedMemberRepository.findAllByEventId(event.id)
 
         assertEquals(group.id, event.groupId)
         assertEquals("Room B", event.location)
+        assertEquals("Bring agenda", event.memo)
         assertEquals(listOf(session.userId), shares.map { it.userId })
     }
 
@@ -183,6 +186,7 @@ class EventApiTest : IntegrationTestSupport() {
                 creatorId = session.userId,
                 updaterId = session.userId,
                 title = "All Day",
+                memo = "Remote friendly",
                 location = "Online",
                 startsAt = Instant.parse("2026-03-01T15:00:00Z"),
                 endsAt = Instant.parse("2026-03-02T15:00:00Z"),
@@ -211,8 +215,8 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data.startTime").doesNotExist())
             .andExpect(jsonPath("$.data.endTime").doesNotExist())
             .andExpect(jsonPath("$.data.location").value("Online"))
+            .andExpect(jsonPath("$.data.memo").value("Remote friendly"))
             .andExpect(jsonPath("$.data.members[0].colorId").value("YELLOW"))
-            .andExpect(jsonPath("$.data.memo").doesNotExist())
             .andExpect(jsonPath("$.data.creatorId").doesNotExist())
             .andExpect(jsonPath("$.data.startsAt").doesNotExist())
     }
@@ -251,6 +255,7 @@ class EventApiTest : IntegrationTestSupport() {
                       "startTime":"13:00",
                       "endTime":"14:00",
                       "location":"Room C",
+                      "memo":"Updated memo",
                       "sharedMemberIds":[${session.userId}]
                     }
                     """.trimIndent(),
@@ -264,6 +269,7 @@ class EventApiTest : IntegrationTestSupport() {
 
         assertEquals("After", updatedEvent.title)
         assertEquals("Room C", updatedEvent.location)
+        assertEquals("Updated memo", updatedEvent.memo)
         assertEquals(session.userId, updatedEvent.updaterId)
         assertEquals(listOf(session.userId), shares.map { it.userId })
     }

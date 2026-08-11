@@ -36,6 +36,7 @@ class EventCommandService(
         startTime: String?,
         endTime: String?,
         location: String?,
+        memo: String?,
         sharedMemberIds: List<Long>,
     ): Long {
         val range = toRange(date, startTime, endTime)
@@ -43,7 +44,7 @@ class EventCommandService(
             user = user,
             groupId = groupId,
             title = title,
-            memo = null,
+            memo = memo,
             location = location,
             startsAt = range.first.toString(),
             endsAt = range.second.toString(),
@@ -97,6 +98,7 @@ class EventCommandService(
         startTime: String?,
         endTime: String?,
         location: String?,
+        memo: String?,
         sharedMemberIds: List<Long>,
     ) {
         val event = eventRepository.findById(eventId).orElse(null)
@@ -108,7 +110,7 @@ class EventCommandService(
             groupId = event.groupId,
             eventId = eventId,
             title = title,
-            memo = event.memo,
+            memo = memo,
             location = location,
             startsAt = range.first.toString(),
             endsAt = range.second.toString(),
