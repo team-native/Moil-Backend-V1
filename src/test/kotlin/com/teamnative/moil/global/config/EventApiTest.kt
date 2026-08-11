@@ -143,6 +143,45 @@ class EventApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `create event stores null memo when request memo is blank`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Create Blank Memo Event Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "groupId":${group.id},
+                      "title":"Planning",
+                      "date":"2026-02-03",
+                      "startTime":"09:30",
+                      "endTime":"10:30",
+                      "location":"Room B",
+                      "memo":"",
+                      "sharedMemberIds":[${session.userId}]
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isOk)
+
+        val event = eventRepository.findAll().first { it.title == "Planning" && it.groupId == group.id }
+
+        assertEquals(null, event.memo)
+    }
+
+    @Test
     fun `create event requires shared members`() {
         val session = createLoginSession(password = "password")
 
@@ -241,7 +280,8 @@ class EventApiTest : IntegrationTestSupport() {
             title = "Before",
             startsAt = Instant.parse("2026-04-01T01:00:00Z"),
             endsAt = Instant.parse("2026-04-01T02:00:00Z"),
-        )
+        ).copy(memo = "Before memo")
+            .let { eventRepository.save(it) }
 
         mockMvc.perform(
             patch("/events/${event.id}")
@@ -272,6 +312,52 @@ class EventApiTest : IntegrationTestSupport() {
         assertEquals("Updated memo", updatedEvent.memo)
         assertEquals(session.userId, updatedEvent.updaterId)
         assertEquals(listOf(session.userId), shares.map { it.userId })
+    }
+
+    @Test
+    fun `update event clears memo when request memo is blank`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Clear Memo Event Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                joinedAt = Instant.now(),
+            ),
+        )
+        val event = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "Before",
+            startsAt = Instant.parse("2026-04-01T01:00:00Z"),
+            endsAt = Instant.parse("2026-04-01T02:00:00Z"),
+        ).copy(memo = "Existing memo")
+            .let { eventRepository.save(it) }
+
+        mockMvc.perform(
+            patch("/events/${event.id}")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "title":"After",
+                      "date":"2026-04-02",
+                      "startTime":"13:00",
+                      "endTime":"14:00",
+                      "location":"Room C",
+                      "memo":"",
+                      "sharedMemberIds":[${session.userId}]
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isOk)
+
+        val updatedEvent = eventRepository.findById(event.id).orElseThrow()
+
+        assertEquals(null, updatedEvent.memo)
     }
 
     @Test
