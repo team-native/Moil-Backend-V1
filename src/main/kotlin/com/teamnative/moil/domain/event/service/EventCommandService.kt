@@ -33,13 +33,12 @@ class EventCommandService(
         groupId: Long,
         title: String,
         date: String,
-        isAllDay: Boolean,
         startTime: String?,
         endTime: String?,
         location: String?,
         sharedMemberIds: List<Long>,
     ): Long {
-        val range = toRange(date, isAllDay, startTime, endTime)
+        val range = toRange(date, startTime, endTime)
         val eventId = create(
             user = user,
             groupId = groupId,
@@ -95,7 +94,6 @@ class EventCommandService(
         eventId: Long,
         title: String,
         date: String,
-        isAllDay: Boolean,
         startTime: String?,
         endTime: String?,
         location: String?,
@@ -103,7 +101,7 @@ class EventCommandService(
     ) {
         val event = eventRepository.findById(eventId).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found.")
-        val range = toRange(date, isAllDay, startTime, endTime)
+        val range = toRange(date, startTime, endTime)
 
         update(
             user = user,
@@ -198,7 +196,6 @@ class EventCommandService(
 
     private fun toRange(
         date: String,
-        isAllDay: Boolean,
         startTime: String?,
         endTime: String?,
     ): Pair<Instant, Instant> {
@@ -209,7 +206,7 @@ class EventCommandService(
         }
         val zone = ZoneId.of("Asia/Seoul")
 
-        if (isAllDay) {
+        if (startTime == null && endTime == null) {
             return day.atStartOfDay(zone).toInstant() to day.plusDays(1).atStartOfDay(zone).toInstant()
         }
 

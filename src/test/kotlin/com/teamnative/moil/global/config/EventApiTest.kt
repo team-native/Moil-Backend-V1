@@ -80,7 +80,7 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data[0].eventId").value(event.id))
             .andExpect(jsonPath("$.data[0].title").value("Team Sync"))
             .andExpect(jsonPath("$.data[0].date").value("2026-01-10"))
-            .andExpect(jsonPath("$.data[0].isAllDay").value(false))
+            .andExpect(jsonPath("$.data[0].isAllDay").doesNotExist())
             .andExpect(jsonPath("$.data[0].startTime").value("10:00"))
             .andExpect(jsonPath("$.data[0].endTime").value("11:00"))
             .andExpect(jsonPath("$.data[0].location").value("Room A"))
@@ -117,7 +117,6 @@ class EventApiTest : IntegrationTestSupport() {
                       "groupId":${group.id},
                       "title":"Planning",
                       "date":"2026-02-03",
-                      "isAllDay":false,
                       "startTime":"09:30",
                       "endTime":"10:30",
                       "location":"Room B",
@@ -154,7 +153,6 @@ class EventApiTest : IntegrationTestSupport() {
                       "groupId":1,
                       "title":"Planning",
                       "date":"2026-02-03",
-                      "isAllDay":true,
                       "sharedMemberIds":[]
                     }
                     """.trimIndent(),
@@ -209,7 +207,7 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data.groupId").value(group.id))
             .andExpect(jsonPath("$.data.title").value("All Day"))
             .andExpect(jsonPath("$.data.date").value("2026-03-02"))
-            .andExpect(jsonPath("$.data.isAllDay").value(true))
+            .andExpect(jsonPath("$.data.isAllDay").doesNotExist())
             .andExpect(jsonPath("$.data.startTime").doesNotExist())
             .andExpect(jsonPath("$.data.endTime").doesNotExist())
             .andExpect(jsonPath("$.data.location").value("Online"))
@@ -250,7 +248,6 @@ class EventApiTest : IntegrationTestSupport() {
                     {
                       "title":"After",
                       "date":"2026-04-02",
-                      "isAllDay":false,
                       "startTime":"13:00",
                       "endTime":"14:00",
                       "location":"Room C",
