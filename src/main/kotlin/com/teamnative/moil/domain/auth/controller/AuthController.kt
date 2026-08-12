@@ -5,11 +5,13 @@ import com.teamnative.moil.domain.auth.dto.ChangePasswordRequest
 import com.teamnative.moil.domain.auth.dto.ConfirmSignupRequest
 import com.teamnative.moil.domain.auth.dto.DeleteAccountRequest
 import com.teamnative.moil.domain.auth.dto.LoginRequest
+import com.teamnative.moil.domain.auth.dto.ProfileResponse
 import com.teamnative.moil.domain.auth.dto.RefreshTokenRequest
 import com.teamnative.moil.domain.auth.dto.RefreshTokenResponse
 import com.teamnative.moil.domain.auth.dto.ResetPasswordRequest
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeRequest
 import com.teamnative.moil.domain.auth.dto.SendEmailCodeResponse
+import com.teamnative.moil.domain.auth.dto.UpdateProfileRequest
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeRequest
 import com.teamnative.moil.domain.auth.dto.VerifyEmailCodeResponse
 import com.teamnative.moil.domain.auth.service.EmailVerificationService
@@ -18,11 +20,13 @@ import com.teamnative.moil.domain.auth.service.ChangePasswordService
 import com.teamnative.moil.domain.auth.service.DeleteAccountService
 import com.teamnative.moil.domain.auth.service.LoginService
 import com.teamnative.moil.domain.auth.service.PasswordResetService
+import com.teamnative.moil.domain.auth.service.ProfileService
 import com.teamnative.moil.domain.auth.service.SignupService
 import com.teamnative.moil.domain.auth.service.TokenRefreshService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
@@ -40,6 +44,7 @@ class AuthController(
     private val changePasswordService: ChangePasswordService,
     private val tokenRefreshService: TokenRefreshService,
     private val deleteAccountService: DeleteAccountService,
+    private val profileService: ProfileService,
 ) {
 
     @GetMapping
@@ -99,6 +104,19 @@ class AuthController(
         changePasswordService.change(user, request.origin, request.newpwd, request.checkpwd)
 
         return ApiResponse.empty("비밀번호가 변경되었습니다.")
+    }
+
+    @PatchMapping("/profile")
+    fun updateProfile(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @Valid @RequestBody request: UpdateProfileRequest,
+    ): ApiResponse<ProfileResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "프로필이 변경되었습니다.",
+            data = profileService.update(user, request.name),
+        )
     }
 
     @PostMapping("/logout")

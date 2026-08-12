@@ -9,6 +9,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
@@ -253,6 +254,28 @@ class AuthApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.status").value(400))
             .andExpect(jsonPath("$.message").value("새 비밀번호가 일치하지 않습니다."))
             .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
+    fun `update profile changes current user name`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            patch("/auth/profile")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"updated-user"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("프로필이 변경되었습니다."))
+            .andExpect(jsonPath("$.data.userId").value(session.userId))
+            .andExpect(jsonPath("$.data.name").value("updated-user"))
+            .andExpect(jsonPath("$.data.email").value(session.email))
+
+        val updatedUser = userAccountRepository.findById(session.userId).orElseThrow()
+        assert(updatedUser.name == "updated-user")
     }
 
     @Test

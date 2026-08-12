@@ -256,6 +256,43 @@ class GroupApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `group member profile update changes my nickname and color`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Profile Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Before",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After","colorId":"BLUE"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.success").value(true))
+            .andExpect(jsonPath("$.status").value(0))
+            .andExpect(jsonPath("$.message").value("프로필이 변경되었습니다."))
+            .andExpect(jsonPath("$.data.groupId").value(group.id))
+            .andExpect(jsonPath("$.data.userId").value(session.userId))
+            .andExpect(jsonPath("$.data.nickname").value("After"))
+            .andExpect(jsonPath("$.data.colorId").value("BLUE"))
+
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Group member not found.")
+
+        assertEquals("After", member.nickname)
+        assertEquals("BLUE", member.color)
+    }
+
+    @Test
     fun `management endpoints return null data and mutate state`() {
         val ownerSession = createLoginSession(password = "password")
         val targetSession = createLoginSession(password = "password")

@@ -14,6 +14,8 @@ import com.teamnative.moil.domain.group.dto.JoinGroupRequest
 import com.teamnative.moil.domain.group.dto.JoinGroupResponse
 import com.teamnative.moil.domain.group.dto.TransferGroupOwnerRequest
 import com.teamnative.moil.domain.group.dto.UpdateGroupMemberRoleRequest
+import com.teamnative.moil.domain.group.dto.UpdateGroupMemberProfileRequest
+import com.teamnative.moil.domain.group.dto.UpdateGroupMemberProfileResponse
 import com.teamnative.moil.domain.group.dto.UpdateGroupNameRequest
 import com.teamnative.moil.domain.group.dto.UpdateGroupNotificationRequest
 import com.teamnative.moil.domain.group.dto.UpdateGroupNotificationResponse
@@ -21,6 +23,7 @@ import com.teamnative.moil.domain.group.service.GroupCreateService
 import com.teamnative.moil.domain.group.service.GroupInviteService
 import com.teamnative.moil.domain.group.service.GroupManagementService
 import com.teamnative.moil.domain.group.service.GroupMemberQueryService
+import com.teamnative.moil.domain.group.service.GroupMemberProfileService
 import com.teamnative.moil.domain.group.service.GroupNotificationService
 import com.teamnative.moil.domain.group.service.GroupQueryService
 import com.teamnative.moil.global.dto.ApiResponse
@@ -46,6 +49,7 @@ class GroupController(
     private val groupCreateService: GroupCreateService,
     private val groupInviteService: GroupInviteService,
     private val groupMemberQueryService: GroupMemberQueryService,
+    private val groupMemberProfileService: GroupMemberProfileService,
     private val groupNotificationService: GroupNotificationService,
     private val groupManagementService: GroupManagementService,
     private val eventQueryService: EventQueryService,
@@ -154,6 +158,22 @@ class GroupController(
         return ApiResponse.success(
             message = "그룹 알림 설정을 변경했습니다.",
             data = groupNotificationService.update(user, groupId, request.enabled!!),
+        )
+    }
+
+    @PatchMapping("/{groupId:[0-9]+}/members/me")
+    fun updateMyProfile(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable groupId: Long,
+        @Valid @RequestBody request: UpdateGroupMemberProfileRequest,
+    ): ApiResponse<UpdateGroupMemberProfileResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+        val nickname = requireNickname(request.nickname)
+        val color = requireColor(request.colorId)
+
+        return ApiResponse.success(
+            message = "프로필이 변경되었습니다.",
+            data = groupMemberProfileService.update(user, groupId, nickname, color),
         )
     }
 
