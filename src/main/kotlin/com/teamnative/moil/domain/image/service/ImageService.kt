@@ -46,6 +46,11 @@ class ImageService(
         return ImageUploadResponse(imagePath = imagePath(saved.key))
     }
 
+    @Transactional(readOnly = true)
+    fun findByKey(imageKey: String): ProfileImage =
+        profileImageRepository.findByKey(imageKey)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다.")
+
     private fun validateImage(image: MultipartFile, contentType: String) {
         if (image.isEmpty) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일을 업로드해야 합니다.")
