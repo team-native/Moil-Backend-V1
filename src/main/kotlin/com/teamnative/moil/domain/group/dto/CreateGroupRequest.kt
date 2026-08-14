@@ -7,4 +7,5 @@ data class CreateGroupRequest(
     val name: String,
     val nickname: String? = null,
     val colorId: String? = null,
+    val imagePath: String? = null,
 )

@@ -7,4 +7,5 @@ data class JoinGroupRequest(
     val inviteCode: String,
     val nickname: String? = null,
     val colorId: String? = null,
+    val imagePath: String? = null,
 )
