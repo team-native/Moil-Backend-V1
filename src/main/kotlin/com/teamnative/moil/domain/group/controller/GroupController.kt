@@ -171,11 +171,11 @@ class GroupController(
     ): ApiResponse<UpdateGroupMemberProfileResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)
         val nickname = requireNickname(request.nickname)
-        val color = requireColor(request.colorId)
+        val profile = profileSelectionValidator.requireProfileSelection(user, request.colorId, request.imagePath)
 
         return ApiResponse.success(
             message = "프로필이 변경되었습니다.",
-            data = groupMemberProfileService.update(user, groupId, nickname, color),
+            data = groupMemberProfileService.update(user, groupId, nickname, profile),
         )
     }
 

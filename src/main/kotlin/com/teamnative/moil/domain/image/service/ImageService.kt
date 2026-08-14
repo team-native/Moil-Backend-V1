@@ -67,6 +67,11 @@ class ImageService(
         return imagePath(key)
     }
 
+    @Transactional
+    fun deleteByUser(user: UserAccount) {
+        profileImageRepository.deleteByUserId(user.id)
+    }
+
     private fun validateImage(image: MultipartFile, contentType: String) {
         if (image.isEmpty) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일을 업로드해야 합니다.")
