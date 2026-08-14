@@ -12,6 +12,7 @@ import com.teamnative.moil.domain.event.repository.EventRepository
 import com.teamnative.moil.domain.group.model.Group
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import com.teamnative.moil.domain.image.repository.PendingProfileImageRepository
 import com.teamnative.moil.domain.image.repository.ProfileImageRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.security.crypto.password.PasswordEncoder
@@ -44,6 +45,9 @@ abstract class IntegrationTestSupport {
 
     @Autowired
     protected lateinit var profileImageRepository: ProfileImageRepository
+
+    @Autowired
+    protected lateinit var pendingProfileImageRepository: PendingProfileImageRepository
 
     @Autowired
     protected lateinit var passwordEncoder: PasswordEncoder

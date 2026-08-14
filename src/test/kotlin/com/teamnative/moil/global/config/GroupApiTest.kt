@@ -453,7 +453,7 @@ class GroupApiTest : IntegrationTestSupport() {
     }
 
     @Test
-    fun `group member profile update to color deletes uploaded image`() {
+    fun `group member profile update to color does not affect image in other groups`() {
         val session = createLoginSession(password = "password")
         val imagePath = uploadProfileImage(session.accessToken)
         val group = createGroup(name = "Delete Image Profile Group")
@@ -464,8 +464,7 @@ class GroupApiTest : IntegrationTestSupport() {
                 userId = session.userId,
                 role = GroupRole.MEMBER,
                 nickname = "Before",
-                color = null,
-                imagePath = imagePath,
+                color = "RED",
                 joinedAt = Instant.now(),
             ),
         )
@@ -475,11 +474,15 @@ class GroupApiTest : IntegrationTestSupport() {
                 userId = session.userId,
                 role = GroupRole.MEMBER,
                 nickname = "Other",
-                color = null,
-                imagePath = imagePath,
+                color = "RED",
                 joinedAt = Instant.now(),
             ),
         )
+        // Attach the same image to both groups through the real update flow, so it is actually
+        // materialized into permanent storage - just seeding GroupMember.imagePath directly would
+        // leave the upload sitting in the queue and never exercise the release logic below.
+        attachImageToGroup(session.accessToken, group.id, "Before", imagePath)
+        attachImageToGroup(session.accessToken, otherGroup.id, "Other", imagePath)
 
         mockMvc.perform(
             patch("/groups/${group.id}/members/me")
@@ -491,11 +494,141 @@ class GroupApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data.colorId").value("BLUE"))
             .andExpect(jsonPath("$.data.imagePath").doesNotExist())
 
-        assertNull(profileImageRepository.findByUserId(session.userId))
+        val updatedMember = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Group member not found.")
+        assertEquals("BLUE", updatedMember.color)
+        assertNull(updatedMember.imagePath)
+
+        // Switching this group to a color must not touch the image still in use by other groups.
         val otherMember = groupMemberRepository.findByGroupIdAndUserId(otherGroup.id, session.userId)
             ?: error("Other group member not found.")
-        assertEquals("BLUE", otherMember.color)
-        assertNull(otherMember.imagePath)
+        assertNull(otherMember.color)
+        assertEquals(imagePath, otherMember.imagePath)
+        assertEquals(1, profileImageRepository.findAllByUserId(session.userId).size)
+    }
+
+    @Test
+    fun `replacing a group image releases the previous one when unused elsewhere`() {
+        val session = createLoginSession(password = "password")
+        val firstImagePath = uploadProfileImage(session.accessToken)
+        val group = createGroup(name = "Replace Image Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Before",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+        // Materialize the first image via the real attach flow so this test genuinely exercises
+        // release-on-replace, instead of vacuously passing because the image was never stored.
+        attachImageToGroup(session.accessToken, group.id, "Before", firstImagePath)
+
+        val secondImagePath = uploadProfileImage(session.accessToken)
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After","imagePath":"$secondImagePath"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.imagePath").value(secondImagePath))
+
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Group member not found.")
+        assertEquals(secondImagePath, member.imagePath)
+
+        // The old image is no longer referenced anywhere, so it should be released - this
+        // keeps storage bounded to roughly one image per group instead of growing on every
+        // re-upload.
+        val remaining = profileImageRepository.findAllByUserId(session.userId)
+        assertEquals(1, remaining.size)
+        assertEquals(secondImagePath, "/images/" + remaining.single().key)
+    }
+
+    @Test
+    fun `leaving a group releases its image when unused elsewhere`() {
+        val session = createLoginSession(password = "password")
+        val imagePath = uploadProfileImage(session.accessToken)
+        val group = createGroup(name = "Leave Image Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Member",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+        attachImageToGroup(session.accessToken, group.id, "Member", imagePath)
+        assertEquals(1, profileImageRepository.findAllByUserId(session.userId).size)
+
+        mockMvc.perform(
+            delete("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+
+        assertEquals(0, profileImageRepository.findAllByUserId(session.userId).size)
+    }
+
+    @Test
+    fun `same user can use different images in different groups`() {
+        val session = createLoginSession(password = "password")
+        val firstImagePath = uploadProfileImage(session.accessToken)
+        val group = createGroup(name = "First Image Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Member",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+        // Materialize (and thereby clear from the queue) before the second upload, since the
+        // upload queue only ever holds one pending image per user.
+        attachImageToGroup(session.accessToken, group.id, "Member", firstImagePath)
+
+        val secondImagePath = uploadProfileImage(session.accessToken)
+        val otherGroup = createGroup(name = "Second Image Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = otherGroup.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Member",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+        attachImageToGroup(session.accessToken, otherGroup.id, "Member", secondImagePath)
+
+        assertEquals(
+            firstImagePath,
+            groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)?.imagePath,
+        )
+        assertEquals(
+            secondImagePath,
+            groupMemberRepository.findByGroupIdAndUserId(otherGroup.id, session.userId)?.imagePath,
+        )
+        assertEquals(2, profileImageRepository.findAllByUserId(session.userId).size)
+    }
+
+    @Test
+    fun `uploading without ever attaching does not create a permanent image`() {
+        val session = createLoginSession(password = "password")
+        uploadProfileImage(session.accessToken)
+
+        // Never used to create, join, or update a group profile - so it must still be sitting
+        // in the upload queue rather than having leaked into permanent storage.
+        assertEquals(0, profileImageRepository.findAllByUserId(session.userId).size)
+        assertEquals(true, pendingProfileImageRepository.findById(session.userId).isPresent)
     }
 
     @Test
@@ -612,8 +745,21 @@ class GroupApiTest : IntegrationTestSupport() {
         assertEquals(1, eventSharedMemberRepository.findAllByEventId(otherGroupEvent.id).size)
     }
 
+    // Attaches an image to a group profile through the real update endpoint, which is what
+    // actually materializes a queued upload into permanent storage. Seeding GroupMember.imagePath
+    // directly via the repository would skip that materialization step entirely.
+    private fun attachImageToGroup(accessToken: String, groupId: Long, nickname: String, imagePath: String) {
+        mockMvc.perform(
+            patch("/groups/$groupId/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"$nickname","imagePath":"$imagePath"}"""),
+        ).andExpect(status().isOk)
+    }
+
     private fun uploadProfileImage(accessToken: String): String {
-        val file = MockMultipartFile("image", "profile.png", "image/png", byteArrayOf(1, 2, 3))
+        val pngSignature = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+        val file = MockMultipartFile("image", "profile.png", "image/png", pngSignature + byteArrayOf(1, 2, 3))
         val result = mockMvc.perform(
             multipart("/images")
                 .file(file)

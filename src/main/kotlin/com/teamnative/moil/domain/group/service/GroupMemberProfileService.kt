@@ -18,6 +18,8 @@ class GroupMemberProfileService(
     @Transactional
     fun update(user: UserAccount, groupId: Long, nickname: String, profile: ProfileSelection): UpdateGroupMemberProfileResponse {
         val access = groupPermissionService.requireMember(user, groupId)
+        val previousImagePath = access.member.imagePath
+
         val member = groupMemberRepository.save(
             access.member.copy(
                 nickname = nickname.trim(),
@@ -26,10 +28,7 @@ class GroupMemberProfileService(
             ),
         )
 
-        if (profile.colorId != null) {
-            groupMemberRepository.resetImageProfilesByUserId(user.id, profile.colorId)
-            imageService.deleteByUser(user)
-        }
+        releasePreviousImageIfUnused(user, previousImagePath, profile.imagePath)
 
         return UpdateGroupMemberProfileResponse(
             groupId = member.groupId,
@@ -38,5 +37,18 @@ class GroupMemberProfileService(
             colorId = member.color,
             imagePath = member.imagePath,
         )
+    }
+
+    // Bounds storage to roughly one image per group a user customizes: once this group no
+    // longer points at the old image, delete it - unless the user reused the same image in
+    // another group, in which case it must stay alive for that group.
+    private fun releasePreviousImageIfUnused(user: UserAccount, previousImagePath: String?, newImagePath: String?) {
+        if (previousImagePath == null || previousImagePath == newImagePath) {
+            return
+        }
+
+        if (!groupMemberRepository.existsByUserIdAndImagePath(user.id, previousImagePath)) {
+            imageService.deleteByPath(user, previousImagePath)
+        }
     }
 }

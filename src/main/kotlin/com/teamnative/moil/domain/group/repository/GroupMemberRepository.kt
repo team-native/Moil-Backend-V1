@@ -28,6 +28,11 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
 
     fun countByGroupId(groupId: Long): Long
 
+    // Used to check whether an image is still in use by any of a user's other group
+    // memberships before deleting it, so per-group image swaps stay bounded to one
+    // stored image per group without breaking images still shared elsewhere.
+    fun existsByUserIdAndImagePath(userId: Long, imagePath: String): Boolean
+
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
         """
