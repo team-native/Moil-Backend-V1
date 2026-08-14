@@ -1,5 +1,6 @@
 package com.teamnative.moil.global.config
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.teamnative.moil.domain.auth.model.LoginSession
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
@@ -11,6 +12,7 @@ import com.teamnative.moil.domain.event.repository.EventRepository
 import com.teamnative.moil.domain.group.model.Group
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import com.teamnative.moil.domain.image.repository.ProfileImageRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.web.servlet.MockMvc
@@ -41,6 +43,9 @@ abstract class IntegrationTestSupport {
     protected lateinit var eventRepository: EventRepository
 
     @Autowired
+    protected lateinit var profileImageRepository: ProfileImageRepository
+
+    @Autowired
     protected lateinit var passwordEncoder: PasswordEncoder
 
     @Autowired
@@ -48,6 +53,9 @@ abstract class IntegrationTestSupport {
 
     @Autowired
     protected lateinit var jwtProperties: JwtProperties
+
+    @Autowired
+    protected lateinit var objectMapper: ObjectMapper
 
     protected fun createLoginSession(password: String, expired: Boolean = false): TestLoginSession {
         val id = UUID.randomUUID()

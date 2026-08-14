@@ -12,8 +12,10 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
+import org.springframework.mock.web.MockMultipartFile
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
@@ -87,6 +89,29 @@ class GroupApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `create group accepts image profile`() {
+        val session = createLoginSession(password = "password")
+        val imagePath = uploadProfileImage(session.accessToken)
+        val groupName = "Image Group ${UUID.randomUUID()}"
+
+        mockMvc.perform(
+            post("/groups")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"$groupName","nickname":"Moil","imagePath":"$imagePath"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.groupId").exists())
+
+        val group = groupRepository.findAll().first { it.name == groupName }
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Created owner member not found.")
+
+        assertNull(member.color)
+        assertEquals(imagePath, member.imagePath)
+    }
+
+    @Test
     fun `join verify and join use notion paths and keys`() {
         val ownerSession = createLoginSession(password = "password")
         val joinSession = createLoginSession(password = "password")
@@ -134,6 +159,40 @@ class GroupApiTest : IntegrationTestSupport() {
         assertEquals(GroupRole.MEMBER, member.role)
         assertEquals("Guest", member.nickname)
         assertEquals("GREEN", member.color)
+    }
+
+    @Test
+    fun `join group accepts image profile and returns image path`() {
+        val ownerSession = createLoginSession(password = "password")
+        val joinSession = createLoginSession(password = "password")
+        val imagePath = uploadProfileImage(joinSession.accessToken)
+        val group = createGroup(name = "Image Join Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = ownerSession.userId,
+                role = GroupRole.OWNER,
+                nickname = "Owner",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/join")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${joinSession.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"${group.inviteCode}","nickname":"Guest","imagePath":"$imagePath"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.myColor").doesNotExist())
+            .andExpect(jsonPath("$.data.myImagePath").value(imagePath))
+
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, joinSession.userId)
+            ?: error("Joined member not found.")
+
+        assertNull(member.color)
+        assertEquals(imagePath, member.imagePath)
     }
 
     @Test
@@ -293,6 +352,137 @@ class GroupApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `group member profile update changes to image and members return image path`() {
+        val session = createLoginSession(password = "password")
+        val imagePath = uploadProfileImage(session.accessToken)
+        val group = createGroup(name = "Image Profile Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Before",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After","imagePath":"$imagePath"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.nickname").value("After"))
+            .andExpect(jsonPath("$.data.colorId").doesNotExist())
+            .andExpect(jsonPath("$.data.imagePath").value(imagePath))
+
+        mockMvc.perform(
+            get("/groups/${group.id}/members")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].colorId").doesNotExist())
+            .andExpect(jsonPath("$.data[0].imagePath").value(imagePath))
+
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Group member not found.")
+
+        assertEquals("After", member.nickname)
+        assertNull(member.color)
+        assertEquals(imagePath, member.imagePath)
+    }
+
+    @Test
+    fun `group member profile update rejects invalid profile selection`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Invalid Profile Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Before",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After"}"""),
+        )
+            .andExpect(status().isBadRequest)
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After","colorId":"BLUE","imagePath":"/images/abc"}"""),
+        )
+            .andExpect(status().isBadRequest)
+    }
+
+    @Test
+    fun `group member profile update rejects other user image`() {
+        val ownerSession = createLoginSession(password = "password")
+        val session = createLoginSession(password = "password")
+        val imagePath = uploadProfileImage(ownerSession.accessToken)
+        val group = createGroup(name = "Forbidden Image Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Before",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After","imagePath":"$imagePath"}"""),
+        )
+            .andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `group member profile update to color deletes uploaded image`() {
+        val session = createLoginSession(password = "password")
+        val imagePath = uploadProfileImage(session.accessToken)
+        val group = createGroup(name = "Delete Image Profile Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Before",
+                color = null,
+                imagePath = imagePath,
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After","colorId":"BLUE"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.colorId").value("BLUE"))
+            .andExpect(jsonPath("$.data.imagePath").doesNotExist())
+
+        assertNull(profileImageRepository.findByUserId(session.userId))
+    }
+
+    @Test
     fun `management endpoints return null data and mutate state`() {
         val ownerSession = createLoginSession(password = "password")
         val targetSession = createLoginSession(password = "password")
@@ -404,5 +594,21 @@ class GroupApiTest : IntegrationTestSupport() {
         assertNull(groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId))
         assertEquals(emptyList<EventSharedMember>(), eventSharedMemberRepository.findAllByEventId(groupEvent.id))
         assertEquals(1, eventSharedMemberRepository.findAllByEventId(otherGroupEvent.id).size)
+    }
+
+    private fun uploadProfileImage(accessToken: String): String {
+        val file = MockMultipartFile("image", "profile.png", "image/png", byteArrayOf(1, 2, 3))
+        val result = mockMvc.perform(
+            multipart("/images")
+                .file(file)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer $accessToken"),
+        )
+            .andExpect(status().isOk)
+            .andReturn()
+
+        return objectMapper.readTree(result.response.contentAsString)
+            .path("data")
+            .path("imagePath")
+            .asText()
     }
 }

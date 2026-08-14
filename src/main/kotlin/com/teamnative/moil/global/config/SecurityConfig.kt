@@ -29,6 +29,7 @@ class SecurityConfig {
                         "/auth/**",
                         "/groups/**",
                         "/events/**",
+                        "/images/**",
                     ).permitAll()
                     .anyRequest().authenticated()
             }
