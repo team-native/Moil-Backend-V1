@@ -29,6 +29,8 @@ moil:
     username: ${SMTP_USERNAME:}
     password: ${SMTP_PASSWORD:}
     from: ${SMTP_FROM:}
+  app-link:
+    group-join-template: ${GROUP_JOIN_APP_LINK_TEMPLATE:moil://join/{groupId}}
 
 server:
   port: 6500
