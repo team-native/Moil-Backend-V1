@@ -27,6 +27,7 @@ class SecurityConfig {
                         "/health",
                         "/actuator/health",
                         "/auth/**",
+                        "/join/**",
                         "/groups/**",
                         "/events/**",
                         "/images/**",

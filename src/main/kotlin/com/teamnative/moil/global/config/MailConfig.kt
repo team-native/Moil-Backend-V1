@@ -1,6 +1,5 @@
 package com.teamnative.moil.global.config
 
-import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.mail.javamail.JavaMailSender
@@ -9,7 +8,6 @@ import java.time.Clock
 import java.util.Properties
 
 @Configuration
-@EnableConfigurationProperties(SmtpProperties::class, JwtProperties::class)
 class MailConfig {
 
     @Bean
