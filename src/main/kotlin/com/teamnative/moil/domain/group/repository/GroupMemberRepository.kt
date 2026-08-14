@@ -3,7 +3,9 @@ package com.teamnative.moil.domain.group.repository
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
 import org.springframework.data.jpa.repository.JpaRepository
+import org.springframework.data.jpa.repository.Modifying
 import org.springframework.data.jpa.repository.Query
+import org.springframework.data.repository.query.Param
 import org.springframework.stereotype.Repository
 
 @Repository
@@ -25,6 +27,21 @@ interface GroupMemberRepository : JpaRepository<GroupMember, Long> {
     fun deleteByGroupIdIn(groupIds: Collection<Long>)
 
     fun countByGroupId(groupId: Long): Long
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query(
+        """
+        update GroupMember member
+        set member.color = :color,
+            member.imagePath = null
+        where member.userId = :userId
+          and member.imagePath is not null
+        """,
+    )
+    fun resetImageProfilesByUserId(
+        @Param("userId") userId: Long,
+        @Param("color") color: String = "RED",
+    )
 
     @Query(
         """

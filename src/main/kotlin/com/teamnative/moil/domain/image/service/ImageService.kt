@@ -28,7 +28,6 @@ class ImageService(
         val saved = profileImageRepository.save(
             profileImageRepository.findByUserId(user.id)
                 ?.copy(
-                    key = generateKey(),
                     image = image.bytes,
                     contentType = contentType,
                     updatedAt = now,

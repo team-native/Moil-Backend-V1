@@ -8,6 +8,7 @@ import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.model.GroupRole
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import com.teamnative.moil.domain.image.service.ImageService
 import org.springframework.http.HttpStatus
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
@@ -23,6 +24,7 @@ class DeleteAccountService(
     private val eventSharedMemberRepository: EventSharedMemberRepository,
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val imageService: ImageService,
     private val passwordEncoder: PasswordEncoder,
 ) {
 
@@ -33,6 +35,7 @@ class DeleteAccountService(
         }
 
         applyCalendarDataPolicy(user, leftData)
+        deleteProfileImage(user, leftData)
         loginSessionRepository.deleteByUserId(user.id)
         if (leftData) {
             anonymizeUser(user)
@@ -70,6 +73,14 @@ class DeleteAccountService(
         }
 
         groupMemberRepository.deleteByUserId(user.id)
+    }
+
+    private fun deleteProfileImage(user: UserAccount, leftData: Boolean) {
+        if (leftData) {
+            groupMemberRepository.resetImageProfilesByUserId(user.id)
+        }
+
+        imageService.deleteByUser(user)
     }
 
     private fun transferOwnedGroups(user: UserAccount) {
