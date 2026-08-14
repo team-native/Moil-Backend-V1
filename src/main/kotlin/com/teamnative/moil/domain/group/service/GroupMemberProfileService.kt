@@ -26,7 +26,11 @@ class GroupMemberProfileService(
             groupId = member.groupId,
             userId = member.userId,
             nickname = member.nickname,
-            colorId = member.color,
+            colorId = member.color ?: DEFAULT_PROFILE_COLOR,
         )
+    }
+
+    companion object {
+        private const val DEFAULT_PROFILE_COLOR = "RED"
     }
 }

@@ -152,7 +152,7 @@ class EventQueryService(
             EventMemberResponse(
                 userId = share.userId,
                 nickname = member.nickname,
-                colorId = member.color,
+                colorId = member.color ?: DEFAULT_PROFILE_COLOR,
             )
         }
     }

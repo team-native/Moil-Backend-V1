@@ -45,8 +45,11 @@ data class GroupMember(
     @Column(nullable = false, length = 10)
     val nickname: String = "User",
 
-    @Column(nullable = false, length = 20)
-    val color: String = "RED",
+    @Column(nullable = true, length = 20)
+    val color: String? = "RED",
+
+    @Column(nullable = true, length = 255)
+    val imagePath: String? = null,
 
     @Column(nullable = false)
     val joinedAt: Instant,

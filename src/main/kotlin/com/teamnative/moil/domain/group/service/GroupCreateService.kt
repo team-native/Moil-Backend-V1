@@ -2,6 +2,7 @@ package com.teamnative.moil.domain.group.service
 
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.group.dto.CreateGroupResponse
+import com.teamnative.moil.domain.group.dto.ProfileSelection
 import com.teamnative.moil.domain.group.model.Group
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
@@ -21,7 +22,7 @@ class GroupCreateService(
 ) {
 
     @Transactional
-    fun create(user: UserAccount, name: String, nickname: String, color: String): CreateGroupResponse {
+    fun create(user: UserAccount, name: String, nickname: String, profile: ProfileSelection): CreateGroupResponse {
         val group = groupRepository.save(
             Group(
                 name = name,
@@ -38,7 +39,8 @@ class GroupCreateService(
                 role = GroupRole.OWNER,
                 notificationEnabled = true,
                 nickname = nickname,
-                color = color,
+                color = profile.colorId,
+                imagePath = profile.imagePath,
                 joinedAt = Instant.now(clock),
             ),
         )

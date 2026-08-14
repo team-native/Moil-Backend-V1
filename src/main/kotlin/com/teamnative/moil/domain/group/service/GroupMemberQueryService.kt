@@ -31,9 +31,13 @@ class GroupMemberQueryService(
                 nickname = member.nickname,
                 email = memberUser.email,
                 role = member.role.toApiRole(),
-                colorId = member.color,
+                colorId = member.color ?: DEFAULT_PROFILE_COLOR,
                 isMe = member.userId == user.id,
             )
         }
+    }
+
+    companion object {
+        private const val DEFAULT_PROFILE_COLOR = "RED"
     }
 }
