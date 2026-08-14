@@ -5,6 +5,7 @@ import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.model.GroupRole
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import com.teamnative.moil.domain.image.service.ImageService
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -16,6 +17,7 @@ class GroupManagementService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
     private val eventSharedMemberRepository: EventSharedMemberRepository,
+    private val imageService: ImageService,
 ) {
 
     @Transactional
@@ -107,8 +109,14 @@ class GroupManagementService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "OWNER cannot leave a group.")
         }
 
+        val imagePath = access.member.imagePath
+
         eventSharedMemberRepository.deleteByUserIdAndGroupId(user.id, groupId)
         groupMemberRepository.delete(access.member)
+
+        if (imagePath != null && !groupMemberRepository.existsByUserIdAndImagePath(user.id, imagePath)) {
+            imageService.deleteByPath(user, imagePath)
+        }
     }
 }
 

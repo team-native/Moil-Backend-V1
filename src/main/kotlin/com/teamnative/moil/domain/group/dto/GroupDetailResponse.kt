@@ -14,5 +14,6 @@ data class GroupDetailMemberResponse(
     val userId: Long,
     val nickname: String,
     val role: String,
-    val color: String,
+    val color: String?,
+    val imagePath: String?,
 )

@@ -26,6 +26,7 @@ import com.teamnative.moil.domain.group.service.GroupMemberQueryService
 import com.teamnative.moil.domain.group.service.GroupMemberProfileService
 import com.teamnative.moil.domain.group.service.GroupNotificationService
 import com.teamnative.moil.domain.group.service.GroupQueryService
+import com.teamnative.moil.domain.group.service.ProfileSelectionValidator
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -53,6 +54,7 @@ class GroupController(
     private val groupNotificationService: GroupNotificationService,
     private val groupManagementService: GroupManagementService,
     private val eventQueryService: EventQueryService,
+    private val profileSelectionValidator: ProfileSelectionValidator,
 ) {
 
     @PostMapping("/me")
@@ -74,11 +76,11 @@ class GroupController(
     ): ApiResponse<CreateGroupResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)
         val nickname = requireNickname(request.nickname)
-        val color = requireColor(request.colorId)
+        val profile = profileSelectionValidator.requireProfileSelection(user, request.colorId, request.imagePath)
 
         return ApiResponse.success(
             message = "그룹을 생성했습니다.",
-            data = groupCreateService.create(user, request.name, nickname, color),
+            data = groupCreateService.create(user, request.name, nickname, profile),
         )
     }
 
@@ -102,11 +104,11 @@ class GroupController(
     ): ApiResponse<JoinGroupResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)
         val nickname = requireNickname(request.nickname)
-        val color = requireColor(request.colorId)
+        val profile = profileSelectionValidator.requireProfileSelection(user, request.colorId, request.imagePath)
 
         return ApiResponse.success(
             message = "그룹에 참여했습니다.",
-            data = groupInviteService.join(user, request.inviteCode, nickname, color),
+            data = groupInviteService.join(user, request.inviteCode, nickname, profile),
         )
     }
 
@@ -169,11 +171,11 @@ class GroupController(
     ): ApiResponse<UpdateGroupMemberProfileResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)
         val nickname = requireNickname(request.nickname)
-        val color = requireColor(request.colorId)
+        val profile = profileSelectionValidator.requireProfileSelection(user, request.colorId, request.imagePath)
 
         return ApiResponse.success(
             message = "프로필이 변경되었습니다.",
-            data = groupMemberProfileService.update(user, groupId, nickname, color),
+            data = groupMemberProfileService.update(user, groupId, nickname, profile),
         )
     }
 

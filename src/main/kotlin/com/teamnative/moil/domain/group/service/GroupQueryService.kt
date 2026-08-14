@@ -41,6 +41,7 @@ class GroupQueryService(
                 myRole = member.role.toApiRole(),
                 myNickname = member.nickname,
                 myColor = member.color,
+                myImagePath = member.imagePath,
                 memberCount = groupMemberRepository.countByGroupId(group.id),
             )
         }
@@ -76,6 +77,7 @@ class GroupQueryService(
                     nickname = member.nickname,
                     role = member.role.toApiRole(),
                     color = member.color,
+                    imagePath = member.imagePath,
                 )
             },
         )

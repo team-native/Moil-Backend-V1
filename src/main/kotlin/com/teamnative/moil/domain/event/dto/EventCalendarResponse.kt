@@ -14,5 +14,6 @@ data class EventCalendarResponse(
 data class EventMemberResponse(
     val userId: Long,
     val nickname: String,
-    val colorId: String,
+    val colorId: String?,
+    val imagePath: String?,
 )

@@ -131,6 +131,7 @@ class EventQueryService(
                         userId = creatorId,
                         nickname = creator?.name.orEmpty(),
                         colorId = DEFAULT_PROFILE_COLOR,
+                        imagePath = null,
                     ),
                 )
             },
@@ -153,6 +154,7 @@ class EventQueryService(
                 userId = share.userId,
                 nickname = member.nickname,
                 colorId = member.color,
+                imagePath = member.imagePath,
             )
         }
     }

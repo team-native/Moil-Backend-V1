@@ -32,6 +32,7 @@ class GroupMemberQueryService(
                 email = memberUser.email,
                 role = member.role.toApiRole(),
                 colorId = member.color,
+                imagePath = member.imagePath,
                 isMe = member.userId == user.id,
             )
         }

@@ -7,7 +7,8 @@ data class GroupMemberResponse(
     val nickname: String,
     val email: String,
     val role: String,
-    val colorId: String,
+    val colorId: String?,
+    val imagePath: String?,
     @get:JsonProperty("isMe")
     val isMe: Boolean,
 )

@@ -2,11 +2,13 @@ package com.teamnative.moil.domain.group.service
 
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.group.dto.CreateGroupResponse
+import com.teamnative.moil.domain.group.dto.ProfileSelection
 import com.teamnative.moil.domain.group.model.Group
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import com.teamnative.moil.domain.image.service.ImageService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -17,11 +19,12 @@ import java.util.UUID
 class GroupCreateService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val imageService: ImageService,
     private val clock: Clock,
 ) {
 
     @Transactional
-    fun create(user: UserAccount, name: String, nickname: String, color: String): CreateGroupResponse {
+    fun create(user: UserAccount, name: String, nickname: String, profile: ProfileSelection): CreateGroupResponse {
         val group = groupRepository.save(
             Group(
                 name = name,
@@ -29,6 +32,7 @@ class GroupCreateService(
                 createdAt = Instant.now(clock),
             ),
         )
+        val imagePath = profile.imagePath?.let { imageService.materializeOwnedImagePath(user, it) }
 
         groupMemberRepository.save(
             GroupMember(
@@ -38,7 +42,8 @@ class GroupCreateService(
                 role = GroupRole.OWNER,
                 notificationEnabled = true,
                 nickname = nickname,
-                color = color,
+                color = profile.colorId,
+                imagePath = imagePath,
                 joinedAt = Instant.now(clock),
             ),
         )
