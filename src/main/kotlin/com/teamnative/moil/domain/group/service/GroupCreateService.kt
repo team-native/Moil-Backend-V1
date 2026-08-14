@@ -8,6 +8,7 @@ import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import com.teamnative.moil.domain.image.service.ImageService
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.time.Clock
@@ -18,6 +19,7 @@ import java.util.UUID
 class GroupCreateService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val imageService: ImageService,
     private val clock: Clock,
 ) {
 
@@ -30,6 +32,7 @@ class GroupCreateService(
                 createdAt = Instant.now(clock),
             ),
         )
+        val imagePath = profile.imagePath?.let { imageService.materializeOwnedImagePath(user, it) }
 
         groupMemberRepository.save(
             GroupMember(
@@ -40,7 +43,7 @@ class GroupCreateService(
                 notificationEnabled = true,
                 nickname = nickname,
                 color = profile.colorId,
-                imagePath = profile.imagePath,
+                imagePath = imagePath,
                 joinedAt = Instant.now(clock),
             ),
         )

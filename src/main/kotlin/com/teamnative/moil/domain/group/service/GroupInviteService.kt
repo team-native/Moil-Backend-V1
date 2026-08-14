@@ -9,6 +9,7 @@ import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
+import com.teamnative.moil.domain.image.service.ImageService
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
@@ -21,6 +22,7 @@ import java.time.Instant
 class GroupInviteService(
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
+    private val imageService: ImageService,
     private val clock: Clock,
 ) {
 
@@ -39,6 +41,7 @@ class GroupInviteService(
     @Transactional
     fun join(user: UserAccount, inviteCode: String, nickname: String, profile: ProfileSelection): JoinGroupResponse {
         val group = findJoinableGroup(user, inviteCode)
+        val imagePath = profile.imagePath?.let { imageService.materializeOwnedImagePath(user, it) }
 
         try {
             groupMemberRepository.saveAndFlush(
@@ -49,7 +52,7 @@ class GroupInviteService(
                     notificationEnabled = true,
                     nickname = nickname,
                     color = profile.colorId,
-                    imagePath = profile.imagePath,
+                    imagePath = imagePath,
                     joinedAt = Instant.now(clock),
                 ),
             )
@@ -63,7 +66,7 @@ class GroupInviteService(
             myRole = GroupRole.MEMBER.toApiRole(),
             myNickname = nickname,
             myColor = profile.colorId,
-            myImagePath = profile.imagePath,
+            myImagePath = imagePath,
         )
     }
 

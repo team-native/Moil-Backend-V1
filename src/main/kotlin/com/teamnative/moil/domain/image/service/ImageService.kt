@@ -62,14 +62,35 @@ class ImageService(
             ?: pendingProfileImageRepository.findByKey(imageKey)?.toProfileImage()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다.")
 
+    @Transactional(readOnly = true)
+    fun requireOwnedImagePath(user: UserAccount, imagePath: String): String {
+        val key = parseKey(imagePath)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 경로 형식이 올바르지 않습니다.")
+
+        profileImageRepository.findByKey(key)?.let { image ->
+            if (image.userId != user.id) {
+                throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인이 업로드한 이미지만 사용할 수 있습니다.")
+            }
+            return imagePath(key)
+        }
+
+        val pending = pendingProfileImageRepository.findByKey(key)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다.")
+
+        if (pending.userId != user.id) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인이 업로드한 이미지만 사용할 수 있습니다.")
+        }
+
+        return imagePath(key)
+    }
+
     /**
-     * Verifies the caller owns the referenced image and, if it is still sitting in the upload
-     * queue, materializes it into permanent storage now - this is the moment an image actually
-     * becomes "in use" by a group profile, and the reason it survives from here on. An
-     * already-materialized image (e.g. reused for a second group) is left exactly as-is.
+     * Moves a verified upload into permanent storage once a group profile operation is ready
+     * to persist it. Keeping this inside the caller's transaction prevents failed group actions
+     * from leaving unused permanent images behind.
      */
     @Transactional
-    fun requireOwnedImagePath(user: UserAccount, imagePath: String): String {
+    fun materializeOwnedImagePath(user: UserAccount, imagePath: String): String {
         val key = parseKey(imagePath)
             ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 경로 형식이 올바르지 않습니다.")
 

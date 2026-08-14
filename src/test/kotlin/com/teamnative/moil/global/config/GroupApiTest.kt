@@ -453,6 +453,63 @@ class GroupApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `failed profile update does not materialize pending image`() {
+        val ownerSession = createLoginSession(password = "password")
+        val session = createLoginSession(password = "password")
+        val imagePath = uploadProfileImage(session.accessToken)
+        val group = createGroup(name = "No Materialize On Failure Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = ownerSession.userId,
+                role = GroupRole.OWNER,
+                nickname = "Owner",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After","imagePath":"$imagePath"}"""),
+        )
+            .andExpect(status().isForbidden)
+
+        assertEquals(0, profileImageRepository.findAllByUserId(session.userId).size)
+        assertEquals(true, pendingProfileImageRepository.findById(session.userId).isPresent)
+    }
+
+    @Test
+    fun `failed group join does not materialize pending image`() {
+        val session = createLoginSession(password = "password")
+        val imagePath = uploadProfileImage(session.accessToken)
+        val group = createGroup(name = "No Materialize On Join Failure Group")
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = group.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Member",
+                color = "RED",
+                joinedAt = Instant.now(),
+            ),
+        )
+
+        mockMvc.perform(
+            post("/groups/join")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"inviteCode":"${group.inviteCode}","nickname":"Again","imagePath":"$imagePath"}"""),
+        )
+            .andExpect(status().isConflict)
+
+        assertEquals(0, profileImageRepository.findAllByUserId(session.userId).size)
+        assertEquals(true, pendingProfileImageRepository.findById(session.userId).isPresent)
+    }
+
+    @Test
     fun `group member profile update to color does not affect image in other groups`() {
         val session = createLoginSession(password = "password")
         val imagePath = uploadProfileImage(session.accessToken)

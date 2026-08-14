@@ -19,16 +19,17 @@ class GroupMemberProfileService(
     fun update(user: UserAccount, groupId: Long, nickname: String, profile: ProfileSelection): UpdateGroupMemberProfileResponse {
         val access = groupPermissionService.requireMember(user, groupId)
         val previousImagePath = access.member.imagePath
+        val imagePath = profile.imagePath?.let { imageService.materializeOwnedImagePath(user, it) }
 
         val member = groupMemberRepository.save(
             access.member.copy(
                 nickname = nickname.trim(),
                 color = profile.colorId,
-                imagePath = profile.imagePath,
+                imagePath = imagePath,
             ),
         )
 
-        releasePreviousImageIfUnused(user, previousImagePath, profile.imagePath)
+        releasePreviousImageIfUnused(user, previousImagePath, imagePath)
 
         return UpdateGroupMemberProfileResponse(
             groupId = member.groupId,
