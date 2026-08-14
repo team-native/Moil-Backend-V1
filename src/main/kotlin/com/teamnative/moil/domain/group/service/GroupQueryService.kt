@@ -40,7 +40,8 @@ class GroupQueryService(
                 inviteCode = group.inviteCode,
                 myRole = member.role.toApiRole(),
                 myNickname = member.nickname,
-                myColor = member.color ?: DEFAULT_PROFILE_COLOR,
+                myColor = member.color,
+                myImagePath = member.imagePath,
                 memberCount = groupMemberRepository.countByGroupId(group.id),
             )
         }
@@ -75,13 +76,10 @@ class GroupQueryService(
                     userId = member.userId,
                     nickname = member.nickname,
                     role = member.role.toApiRole(),
-                    color = member.color ?: DEFAULT_PROFILE_COLOR,
+                    color = member.color,
+                    imagePath = member.imagePath,
                 )
             },
         )
-    }
-
-    companion object {
-        private const val DEFAULT_PROFILE_COLOR = "RED"
     }
 }

@@ -6,6 +6,7 @@ data class GroupSummaryResponse(
     val inviteCode: String,
     val myRole: String,
     val myNickname: String,
-    val myColor: String,
+    val myColor: String?,
+    val myImagePath: String?,
     val memberCount: Long,
 )
