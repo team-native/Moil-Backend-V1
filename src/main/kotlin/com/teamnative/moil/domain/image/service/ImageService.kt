@@ -51,6 +51,22 @@ class ImageService(
         profileImageRepository.findByKey(imageKey)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다.")
 
+    @Transactional(readOnly = true)
+    fun requireOwnedImagePath(user: UserAccount, imagePath: String): String {
+        val key = imagePath.removePrefix(IMAGE_PATH_PREFIX)
+            .takeIf { imagePath.startsWith(IMAGE_PATH_PREFIX) && it.isNotBlank() && '/' !in it }
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 경로 형식이 올바르지 않습니다.")
+
+        val image = profileImageRepository.findByKey(key)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다.")
+
+        if (image.userId != user.id) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "본인이 업로드한 이미지만 사용할 수 있습니다.")
+        }
+
+        return imagePath(key)
+    }
+
     private fun validateImage(image: MultipartFile, contentType: String) {
         if (image.isEmpty) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지 파일을 업로드해야 합니다.")
@@ -74,9 +90,10 @@ class ImageService(
         }
     }
 
-    private fun imagePath(key: String): String = "/images/$key"
+    private fun imagePath(key: String): String = "$IMAGE_PATH_PREFIX$key"
 
     companion object {
+        private const val IMAGE_PATH_PREFIX = "/images/"
         private val ALLOWED_CONTENT_TYPES = setOf("image/jpeg", "image/png", "image/webp")
         private const val MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024
     }
