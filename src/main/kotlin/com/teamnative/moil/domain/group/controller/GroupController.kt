@@ -104,11 +104,11 @@ class GroupController(
     ): ApiResponse<JoinGroupResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)
         val nickname = requireNickname(request.nickname)
-        val color = requireColor(request.colorId)
+        val profile = profileSelectionValidator.requireProfileSelection(user, request.colorId, request.imagePath)
 
         return ApiResponse.success(
             message = "그룹에 참여했습니다.",
-            data = groupInviteService.join(user, request.inviteCode, nickname, color),
+            data = groupInviteService.join(user, request.inviteCode, nickname, profile),
         )
     }
 

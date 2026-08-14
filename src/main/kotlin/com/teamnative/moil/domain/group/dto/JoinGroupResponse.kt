@@ -5,5 +5,6 @@ data class JoinGroupResponse(
     val name: String,
     val myRole: String,
     val myNickname: String,
-    val myColor: String,
+    val myColor: String?,
+    val myImagePath: String?,
 )
