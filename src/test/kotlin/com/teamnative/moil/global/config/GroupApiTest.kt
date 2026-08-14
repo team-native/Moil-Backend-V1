@@ -457,12 +457,24 @@ class GroupApiTest : IntegrationTestSupport() {
         val session = createLoginSession(password = "password")
         val imagePath = uploadProfileImage(session.accessToken)
         val group = createGroup(name = "Delete Image Profile Group")
+        val otherGroup = createGroup(name = "Other Image Profile Group")
         groupMemberRepository.save(
             GroupMember(
                 groupId = group.id,
                 userId = session.userId,
                 role = GroupRole.MEMBER,
                 nickname = "Before",
+                color = null,
+                imagePath = imagePath,
+                joinedAt = Instant.now(),
+            ),
+        )
+        groupMemberRepository.save(
+            GroupMember(
+                groupId = otherGroup.id,
+                userId = session.userId,
+                role = GroupRole.MEMBER,
+                nickname = "Other",
                 color = null,
                 imagePath = imagePath,
                 joinedAt = Instant.now(),
@@ -480,6 +492,10 @@ class GroupApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data.imagePath").doesNotExist())
 
         assertNull(profileImageRepository.findByUserId(session.userId))
+        val otherMember = groupMemberRepository.findByGroupIdAndUserId(otherGroup.id, session.userId)
+            ?: error("Other group member not found.")
+        assertEquals("BLUE", otherMember.color)
+        assertNull(otherMember.imagePath)
     }
 
     @Test

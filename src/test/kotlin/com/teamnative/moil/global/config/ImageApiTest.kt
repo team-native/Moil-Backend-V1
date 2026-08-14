@@ -71,6 +71,18 @@ class ImageApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `upload image rejects missing file part`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            multipart("/images")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.data").doesNotExist())
+    }
+
+    @Test
     fun `fetch missing image returns not found`() {
         mockMvc.perform(get("/images/missing"))
             .andExpect(status().isNotFound)

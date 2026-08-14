@@ -27,6 +27,7 @@ class GroupMemberProfileService(
         )
 
         if (profile.colorId != null) {
+            groupMemberRepository.resetImageProfilesByUserId(user.id, profile.colorId)
             imageService.deleteByUser(user)
         }
 
