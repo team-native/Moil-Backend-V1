@@ -4,8 +4,10 @@ import com.teamnative.moil.domain.event.model.EventSharedMember
 import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
+import com.teamnative.moil.global.model.MoilColor
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -86,6 +88,62 @@ class GroupApiTest : IntegrationTestSupport() {
         assertEquals(GroupRole.OWNER, member.role)
         assertEquals("Moil", member.nickname)
         assertEquals("BLUE", member.color)
+    }
+
+    @Test
+    fun `profile color palette includes rainbow and spring colors`() {
+        val expectedColorIds = listOf(
+            "RED",
+            "ORANGE",
+            "YELLOW",
+            "GREEN",
+            "BLUE",
+            "NAVY",
+            "PURPLE",
+            "PINK",
+            "CREAM",
+            "PEACH",
+            "APRICOT",
+            "TAN",
+            "GOLD",
+            "CORAL",
+            "ROSE",
+            "SKY",
+            "LIGHT_BLUE",
+            "MINT",
+            "TEAL",
+            "LIGHT_GREEN",
+            "VIVID_GREEN",
+            "VIOLET",
+            "MAGENTA",
+            "VIVID_ORANGE",
+            "VIVID_RED",
+            "WARM_PINK",
+        )
+
+        expectedColorIds.forEach { colorId ->
+            assertTrue(MoilColor.exists(colorId), "$colorId must be a supported colorId")
+        }
+    }
+
+    @Test
+    fun `create group accepts added profile color ids`() {
+        val session = createLoginSession(password = "password")
+        val groupName = "Palette Group ${UUID.randomUUID()}"
+
+        mockMvc.perform(
+            post("/groups")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"$groupName","nickname":"Moil","colorId":"VIVID_ORANGE"}"""),
+        )
+            .andExpect(status().isOk)
+
+        val group = groupRepository.findAll().first { it.name == groupName }
+        val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
+            ?: error("Created owner member not found.")
+
+        assertEquals("VIVID_ORANGE", member.color)
     }
 
     @Test
@@ -422,6 +480,14 @@ class GroupApiTest : IntegrationTestSupport() {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"nickname":"After","colorId":"BLUE","imagePath":"/images/abc"}"""),
+        )
+            .andExpect(status().isBadRequest)
+
+        mockMvc.perform(
+            patch("/groups/${group.id}/members/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"nickname":"After","colorId":"UNKNOWN_COLOR"}"""),
         )
             .andExpect(status().isBadRequest)
     }
