@@ -41,11 +41,11 @@ class ImageController(
         )
     }
 
-    @GetMapping("/{imageKey}")
+    @GetMapping("/{key}")
     fun image(
-        @PathVariable imageKey: String,
+        @PathVariable key: String,
     ): ResponseEntity<ByteArray> {
-        val image = imageService.findByKey(imageKey)
+        val image = imageService.findByKey(key)
 
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType(image.contentType))

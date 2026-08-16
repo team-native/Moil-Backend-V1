@@ -57,9 +57,9 @@ class ImageService(
     }
 
     @Transactional(readOnly = true)
-    fun findByKey(imageKey: String): ProfileImage =
-        profileImageRepository.findByKey(imageKey)
-            ?: pendingProfileImageRepository.findByKey(imageKey)?.toProfileImage()
+    fun findByKey(key: String): ProfileImage =
+        profileImageRepository.findByKey(key)
+            ?: pendingProfileImageRepository.findByKey(key)?.toProfileImage()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "이미지를 찾을 수 없습니다.")
 
     @Transactional(readOnly = true)
