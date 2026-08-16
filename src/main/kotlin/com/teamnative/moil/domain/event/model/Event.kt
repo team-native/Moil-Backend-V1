@@ -33,10 +33,10 @@ data class Event(
     @Column(nullable = true, length = 255)
     val location: String? = null,
 
-    @Column(nullable = false)
+    @Column(name = "start_date", nullable = false)
     val startsAt: Instant,
 
-    @Column(nullable = false)
+    @Column(name = "end_date", nullable = false)
     val endsAt: Instant,
 
     @Column(nullable = false)

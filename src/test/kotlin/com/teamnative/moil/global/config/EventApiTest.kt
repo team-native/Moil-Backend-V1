@@ -80,10 +80,12 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data[0].eventId").value(event.id))
             .andExpect(jsonPath("$.data[0].title").value("Team Sync"))
-            .andExpect(jsonPath("$.data[0].date").value("2026-01-10"))
+            .andExpect(jsonPath("$.data[0].startDate").value("2026-01-10 10:00"))
+            .andExpect(jsonPath("$.data[0].endDate").value("2026-01-10 11:00"))
             .andExpect(jsonPath("$.data[0].isAllDay").doesNotExist())
-            .andExpect(jsonPath("$.data[0].startTime").value("10:00"))
-            .andExpect(jsonPath("$.data[0].endTime").value("11:00"))
+            .andExpect(jsonPath("$.data[0].date").doesNotExist())
+            .andExpect(jsonPath("$.data[0].startTime").doesNotExist())
+            .andExpect(jsonPath("$.data[0].endTime").doesNotExist())
             .andExpect(jsonPath("$.data[0].location").value("Room A"))
             .andExpect(jsonPath("$.data[0].memo").value("Weekly planning"))
             .andExpect(jsonPath("$.data[0].members[0].userId").value(session.userId))
@@ -118,9 +120,8 @@ class EventApiTest : IntegrationTestSupport() {
                     {
                       "groupId":${group.id},
                       "title":"Planning",
-                      "date":"2026-02-03",
-                      "startTime":"09:30",
-                      "endTime":"10:30",
+                      "startDate":"2026-02-03 09:30",
+                      "endDate":"2026-02-03 10:30",
                       "location":"Room B",
                       "memo":"Bring agenda",
                       "sharedMemberIds":[${session.userId}]
@@ -164,9 +165,8 @@ class EventApiTest : IntegrationTestSupport() {
                     {
                       "groupId":${group.id},
                       "title":"Planning",
-                      "date":"2026-02-03",
-                      "startTime":"09:30",
-                      "endTime":"10:30",
+                      "startDate":"2026-02-03 09:30",
+                      "endDate":"2026-02-03 10:30",
                       "location":"Room B",
                       "memo":"",
                       "sharedMemberIds":[${session.userId}]
@@ -194,8 +194,32 @@ class EventApiTest : IntegrationTestSupport() {
                     {
                       "groupId":1,
                       "title":"Planning",
-                      "date":"2026-02-03",
+                      "startDate":"2026-02-03 00:00",
+                      "endDate":"2026-02-04 00:00",
                       "sharedMemberIds":[]
+                    }
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isBadRequest)
+            .andExpect(jsonPath("$.success").value(false))
+            .andExpect(jsonPath("$.status").value(400))
+    }
+
+    @Test
+    fun `create event requires startDate and endDate`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "groupId":1,
+                      "title":"Planning",
+                      "sharedMemberIds":[${session.userId}]
                     }
                     """.trimIndent(),
                 ),
@@ -249,8 +273,10 @@ class EventApiTest : IntegrationTestSupport() {
             .andExpect(jsonPath("$.data.eventId").value(event.id))
             .andExpect(jsonPath("$.data.groupId").value(group.id))
             .andExpect(jsonPath("$.data.title").value("All Day"))
-            .andExpect(jsonPath("$.data.date").value("2026-03-02"))
+            .andExpect(jsonPath("$.data.startDate").value("2026-03-02 00:00"))
+            .andExpect(jsonPath("$.data.endDate").value("2026-03-03 00:00"))
             .andExpect(jsonPath("$.data.isAllDay").doesNotExist())
+            .andExpect(jsonPath("$.data.date").doesNotExist())
             .andExpect(jsonPath("$.data.startTime").doesNotExist())
             .andExpect(jsonPath("$.data.endTime").doesNotExist())
             .andExpect(jsonPath("$.data.location").value("Online"))
@@ -291,9 +317,8 @@ class EventApiTest : IntegrationTestSupport() {
                     """
                     {
                       "title":"After",
-                      "date":"2026-04-02",
-                      "startTime":"13:00",
-                      "endTime":"14:00",
+                      "startDate":"2026-04-02 13:00",
+                      "endDate":"2026-04-02 14:00",
                       "location":"Room C",
                       "memo":"Updated memo",
                       "sharedMemberIds":[${session.userId}]
@@ -343,9 +368,8 @@ class EventApiTest : IntegrationTestSupport() {
                     """
                     {
                       "title":"After",
-                      "date":"2026-04-02",
-                      "startTime":"13:00",
-                      "endTime":"14:00",
+                      "startDate":"2026-04-02 13:00",
+                      "endDate":"2026-04-02 14:00",
                       "location":"Room C",
                       "memo":"",
                       "sharedMemberIds":[${session.userId}]

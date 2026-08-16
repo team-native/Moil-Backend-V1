@@ -17,6 +17,7 @@ import org.springframework.web.server.ResponseStatusException
 import java.time.Instant
 import java.time.YearMonth
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
 @Service
@@ -97,9 +98,8 @@ class EventQueryService(
                 eventId = calendar.eventId,
                 groupId = groupId,
                 title = calendar.title,
-                date = calendar.date,
-                startTime = calendar.startTime,
-                endTime = calendar.endTime,
+                startDate = calendar.startDate,
+                endDate = calendar.endDate,
                 location = calendar.location,
                 memo = calendar.memo,
                 members = calendar.members,
@@ -112,17 +112,13 @@ class EventQueryService(
         val zone = ZoneId.of("Asia/Seoul")
         val start = startsAt.atZone(zone)
         val end = endsAt.atZone(zone)
-        val isAllDay = start.toLocalTime().toString() == "00:00" &&
-            end.toLocalTime().toString() == "00:00" &&
-            end.toLocalDate() == start.toLocalDate().plusDays(1)
         val creator = userAccountRepository.findById(creatorId).orElse(null)
 
         return EventCalendarResponse(
             eventId = id,
             title = title,
-            date = start.toLocalDate().toString(),
-            startTime = if (isAllDay) null else start.toLocalTime().toString(),
-            endTime = if (isAllDay) null else end.toLocalTime().toString(),
+            startDate = start.format(EVENT_DATE_TIME_FORMATTER),
+            endDate = end.format(EVENT_DATE_TIME_FORMATTER),
             location = location,
             memo = memo,
             members = eventMembers(id, groupId).ifEmpty {
@@ -161,5 +157,6 @@ class EventQueryService(
 
     companion object {
         private const val DEFAULT_PROFILE_COLOR = "RED"
+        private val EVENT_DATE_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     }
 }

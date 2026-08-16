@@ -13,9 +13,9 @@ import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
 import java.time.Clock
 import java.time.Instant
-import java.time.LocalDate
-import java.time.LocalTime
+import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.time.format.DateTimeParseException
 
 @Service
@@ -32,14 +32,13 @@ class EventCommandService(
         user: UserAccount,
         groupId: Long,
         title: String,
-        date: String,
-        startTime: String?,
-        endTime: String?,
+        startDate: String,
+        endDate: String,
         location: String?,
         memo: String?,
         sharedMemberIds: List<Long>,
     ): Long {
-        val range = toRange(date, startTime, endTime)
+        val range = toRange(startDate, endDate)
         val eventId = create(
             user = user,
             groupId = groupId,
@@ -94,16 +93,15 @@ class EventCommandService(
         user: UserAccount,
         eventId: Long,
         title: String,
-        date: String,
-        startTime: String?,
-        endTime: String?,
+        startDate: String,
+        endDate: String,
         location: String?,
         memo: String?,
         sharedMemberIds: List<Long>,
     ) {
         val event = eventRepository.findById(eventId).orElse(null)
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found.")
-        val range = toRange(date, startTime, endTime)
+        val range = toRange(startDate, endDate)
 
         update(
             user = user,
@@ -196,32 +194,17 @@ class EventCommandService(
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid event time format.")
         }
 
-    private fun toRange(
-        date: String,
-        startTime: String?,
-        endTime: String?,
-    ): Pair<Instant, Instant> {
-        val day = try {
-            LocalDate.parse(date)
-        } catch (exception: DateTimeParseException) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid event date format.")
-        }
+    private fun toRange(startDate: String, endDate: String): Pair<Instant, Instant> {
         val zone = ZoneId.of("Asia/Seoul")
 
-        if (startTime == null && endTime == null) {
-            return day.atStartOfDay(zone).toInstant() to day.plusDays(1).atStartOfDay(zone).toInstant()
-        }
-
-        val start = parseTime(startTime)
-        val end = parseTime(endTime)
-
-        return day.atTime(start).atZone(zone).toInstant() to day.atTime(end).atZone(zone).toInstant()
+        return parseDateTime(startDate).atZone(zone).toInstant() to
+            parseDateTime(endDate).atZone(zone).toInstant()
     }
 
-    private fun parseTime(value: String?): LocalTime =
+    private fun parseDateTime(value: String): LocalDateTime =
         try {
-            LocalTime.parse(value)
-        } catch (exception: RuntimeException) {
+            LocalDateTime.parse(value, EVENT_DATE_TIME_FORMATTER)
+        } catch (exception: DateTimeParseException) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid event time format.")
         }
 
@@ -229,5 +212,9 @@ class EventCommandService(
         if (!startsAt.isBefore(endsAt)) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid event time range.")
         }
+    }
+
+    companion object {
+        private val EVENT_DATE_TIME_FORMATTER: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     }
 }
