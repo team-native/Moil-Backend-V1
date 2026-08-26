@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration
 @EnableConfigurationProperties(
     AppLinkProperties::class,
     JwtProperties::class,
+    OauthProperties::class,
     SmtpProperties::class,
 )
 class PropertiesConfig

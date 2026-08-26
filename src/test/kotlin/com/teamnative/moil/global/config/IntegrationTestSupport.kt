@@ -14,6 +14,7 @@ import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupRepository
 import com.teamnative.moil.domain.image.repository.PendingProfileImageRepository
 import com.teamnative.moil.domain.image.repository.ProfileImageRepository
+import com.teamnative.moil.domain.oauth.repository.SocialAccountRepository
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.test.web.servlet.MockMvc
@@ -48,6 +49,9 @@ abstract class IntegrationTestSupport {
 
     @Autowired
     protected lateinit var pendingProfileImageRepository: PendingProfileImageRepository
+
+    @Autowired
+    protected lateinit var socialAccountRepository: SocialAccountRepository
 
     @Autowired
     protected lateinit var passwordEncoder: PasswordEncoder

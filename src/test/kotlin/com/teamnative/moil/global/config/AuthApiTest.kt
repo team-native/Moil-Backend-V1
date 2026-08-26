@@ -4,6 +4,8 @@ import com.teamnative.moil.domain.auth.model.VerifiedSignupSession
 import com.teamnative.moil.domain.auth.dto.EmailVerificationStep
 import com.teamnative.moil.domain.group.model.GroupMember
 import com.teamnative.moil.domain.group.model.GroupRole
+import com.teamnative.moil.domain.oauth.helper.SocialLoginType
+import com.teamnative.moil.domain.oauth.model.SocialAccount
 import org.junit.jupiter.api.Test
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -458,6 +460,15 @@ class AuthApiTest : IntegrationTestSupport() {
     @Test
     fun `delete account anonymizes user and keeps calendar data when left data is true`() {
         val session = createLoginSession(password = "password")
+        socialAccountRepository.save(
+            SocialAccount(
+                userId = session.userId,
+                provider = SocialLoginType.GOOGLE,
+                providerUserId = "google-${session.userId}",
+                email = session.email,
+                createdAt = Instant.now(),
+            ),
+        )
         val group = createGroup(name = "kept-group")
         groupMemberRepository.save(
             GroupMember(
@@ -492,6 +503,7 @@ class AuthApiTest : IntegrationTestSupport() {
         assert(!eventRepository.existsById(event.id))
         assert(!groupRepository.existsById(group.id))
         assert(groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId) == null)
+        assert(socialAccountRepository.findByProviderAndUserId(SocialLoginType.GOOGLE, session.userId) == null)
 
         mockMvc.perform(
             post("/auth/login")
