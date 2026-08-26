@@ -31,6 +31,22 @@ moil:
     from: ${SMTP_FROM:}
   app-link:
     group-join-template: ${GROUP_JOIN_APP_LINK_TEMPLATE:moil://join/{groupId}}
+  oauth:
+    google:
+      client-id: ${GOOGLE_CLIENT_ID:}
+      client-secret: ${GOOGLE_CLIENT_SECRET:}
+      redirect-uri: ${GOOGLE_REDIRECT_URI:http://localhost:6500/oauth/google/callback}
+    kakao:
+      client-id: ${KAKAO_CLIENT_ID:}
+      client-secret: ${KAKAO_CLIENT_SECRET:}
+      redirect-uri: ${KAKAO_REDIRECT_URI:http://localhost:6500/oauth/kakao/callback}
+    apple:
+      client-id: ${APPLE_CLIENT_ID:}
+      client-secret: ${APPLE_CLIENT_SECRET:}
+      redirect-uri: ${APPLE_REDIRECT_URI:http://localhost:6500/oauth/apple/callback}
+      team-id: ${APPLE_TEAM_ID:}
+      key-id: ${APPLE_KEY_ID:}
+      private-key: ${APPLE_PRIVATE_KEY:}
 
 server:
   port: 6500
