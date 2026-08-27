@@ -18,11 +18,11 @@ class OauthService(
         }
     }
 
-    fun callback(socialLoginType: SocialLoginType, code: String): AuthTokenResponse {
+    fun callback(socialLoginType: SocialLoginType, code: String, user: String? = null): AuthTokenResponse {
         return when (socialLoginType) {
             SocialLoginType.GOOGLE -> googleOauth.callback(code)
             SocialLoginType.KAKAO -> kakaoOauth.callback(code)
-            SocialLoginType.APPLE -> appleOauth.callback(code, user = null)
+            SocialLoginType.APPLE -> appleOauth.callback(code, user)
         }
     }
 

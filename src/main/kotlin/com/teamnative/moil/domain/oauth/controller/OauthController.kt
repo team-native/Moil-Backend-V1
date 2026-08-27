@@ -1,21 +1,30 @@
 ﻿package com.teamnative.moil.domain.oauth.controller
 
 import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
+import com.teamnative.moil.domain.oauth.dto.OauthTokenRequest
 import com.teamnative.moil.domain.oauth.helper.SocialLoginType
 import com.teamnative.moil.domain.oauth.service.OauthService
+import com.teamnative.moil.global.config.AppLinkProperties
 import com.teamnative.moil.global.dto.ApiResponse
-import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.servlet.view.RedirectView
 
 
 @RestController
 @RequestMapping("/oauth")
-class OauthController (private val oauthService: OauthService) {
+class OauthController(
+    private val oauthService: OauthService,
+    private val appLinkProperties: AppLinkProperties,
+) {
     @GetMapping("/{socialLoginType}")
     fun socialLogin(@PathVariable socialLoginType: SocialLoginType): RedirectView =
         RedirectView(oauthService.login(socialLoginType))
@@ -23,11 +32,19 @@ class OauthController (private val oauthService: OauthService) {
     @GetMapping("/{socialLoginType}/callback")
     fun callback(
         @PathVariable socialLoginType: SocialLoginType,
-        @RequestParam code: String,
+        @RequestParam(required = false) code: String?,
+        @RequestParam(required = false) error: String?,
+    ): ResponseEntity<Void> =
+        redirectToApp(socialLoginType, code, error, user = null)
+
+    @PostMapping("/{socialLoginType}/token")
+    fun token(
+        @PathVariable socialLoginType: SocialLoginType,
+        @RequestBody request: OauthTokenRequest,
     ): ApiResponse<AuthTokenResponse> =
         ApiResponse.success(
             message = "소셜 로그인이 완료되었습니다.",
-            data = oauthService.callback(socialLoginType, code),
+            data = oauthService.callback(socialLoginType, request.code, request.user),
         )
 
     @GetMapping("/apple")
@@ -36,11 +53,28 @@ class OauthController (private val oauthService: OauthService) {
 
     @PostMapping("/apple/callback")
     fun appleCallback(
-        @RequestParam code: String,
+        @RequestParam(required = false) code: String?,
         @RequestParam(required = false) user: String?,
-    ): ApiResponse<AuthTokenResponse> =
-        ApiResponse.success(
-            message = "소셜 로그인이 완료되었습니다.",
-            data = oauthService.appleCallback(code, user),
-        )
+        @RequestParam(required = false) error: String?,
+    ): ResponseEntity<Void> =
+        redirectToApp(SocialLoginType.APPLE, code, error, user)
+
+    private fun redirectToApp(
+        socialLoginType: SocialLoginType,
+        code: String?,
+        error: String?,
+        user: String?,
+    ): ResponseEntity<Void> {
+        val provider = socialLoginType.name.lowercase()
+        val location = if (code != null) {
+            appLinkProperties.oauthCallbackUri(provider, code, user)
+        } else {
+            appLinkProperties.oauthCallbackErrorUri(provider, error ?: "missing_code")
+        }
+
+        return ResponseEntity
+            .status(HttpStatus.FOUND)
+            .header(HttpHeaders.LOCATION, location)
+            .build()
+    }
 }
