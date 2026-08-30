@@ -12,12 +12,13 @@ data class AppLinkProperties(
     fun groupJoinUri(groupId: Long): String =
         groupJoinTemplate.replace("{groupId}", groupId.toString())
 
-    fun oauthCallbackUri(provider: String, code: String, user: String? = null): String {
+    fun oauthCallbackUri(provider: String, code: String, user: String? = null, state: String? = null): String {
         val builder = UriComponentsBuilder
             .fromUriString(oauthCallbackTemplate.replace("{provider}", provider))
             .queryParam("code", code)
 
         user?.let { builder.queryParam("user", it) }
+        state?.let { builder.queryParam("state", it) }
 
         return builder
             .build()
@@ -25,16 +26,16 @@ data class AppLinkProperties(
             .toUriString()
     }
 
-    fun oauthCallbackTokenUri(provider: String, token: AuthTokenResponse): String =
-        baseOauthCallbackUri(provider)
+    fun oauthCallbackTokenUri(provider: String, token: AuthTokenResponse, state: String? = null): String =
+        baseOauthCallbackUri(provider, state)
             .queryParam("accessToken", token.accessToken)
             .queryParam("refreshToken", token.refreshToken)
             .build()
             .encode()
             .toUriString()
 
-    fun oauthCallbackErrorUri(provider: String, error: String, description: String? = null): String {
-        val builder = baseOauthCallbackUri(provider)
+    fun oauthCallbackErrorUri(provider: String, error: String, description: String? = null, state: String? = null): String {
+        val builder = baseOauthCallbackUri(provider, state)
             .queryParam("error", error)
 
         description?.takeIf { it.isNotBlank() }?.let {
@@ -47,7 +48,10 @@ data class AppLinkProperties(
             .toUriString()
     }
 
-    private fun baseOauthCallbackUri(provider: String): UriComponentsBuilder =
+    private fun baseOauthCallbackUri(provider: String, state: String? = null): UriComponentsBuilder =
         UriComponentsBuilder
             .fromUriString(oauthCallbackTemplate.replace("{provider}", provider))
+            .apply {
+                state?.let { queryParam("state", it) }
+            }
 }

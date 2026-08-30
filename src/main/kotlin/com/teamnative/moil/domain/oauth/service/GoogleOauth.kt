@@ -19,15 +19,20 @@ class GoogleOauth(
 ) {
     private val restClient = RestClient.create()
 
-    fun login(): String =
-        UriComponentsBuilder
+    fun login(state: String? = null): String {
+        val builder = UriComponentsBuilder
             .fromUriString("https://accounts.google.com/o/oauth2/v2/auth")
             .queryParam("client_id", requireSetting(oauthProperties.google.clientId, "GOOGLE_CLIENT_ID"))
             .queryParam("redirect_uri", oauthProperties.google.redirectUri)
             .queryParam("response_type", "code")
             .queryParam("scope", "openid email profile")
+
+        state?.let { builder.queryParam("state", it) }
+
+        return builder
             .encode()
             .toUriString()
+    }
 
     fun callback(code: String): AuthTokenResponse {
         val token = requestToken(code)

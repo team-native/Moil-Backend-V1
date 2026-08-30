@@ -10,11 +10,11 @@ class OauthService(
     private val kakaoOauth: KakaoOauth,
     private val appleOauth: AppleOauth
 ) {
-    fun login(socialLoginType: SocialLoginType): String {
+    fun login(socialLoginType: SocialLoginType, state: String? = null): String {
         return when (socialLoginType) {
-            SocialLoginType.GOOGLE -> googleOauth.login()
-            SocialLoginType.KAKAO -> kakaoOauth.login()
-            SocialLoginType.APPLE -> appleOauth.login()
+            SocialLoginType.GOOGLE -> googleOauth.login(state)
+            SocialLoginType.KAKAO -> kakaoOauth.login(state)
+            SocialLoginType.APPLE -> appleOauth.login(state)
         }
     }
 
@@ -26,7 +26,7 @@ class OauthService(
         }
     }
 
-    fun appleLogin(): String = appleOauth.login()
+    fun appleLogin(state: String? = null): String = appleOauth.login(state)
 
     fun appleCallback(code: String, user: String?): AuthTokenResponse =
         appleOauth.callback(code, user)

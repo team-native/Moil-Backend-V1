@@ -37,10 +37,45 @@ class OauthControllerTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `oauth callback includes state when redirecting tokens to app`() {
+        whenever(oauthService.callback(SocialLoginType.GOOGLE, "google-auth-code", null))
+            .thenReturn(authTokenResponse(accessToken = "app.access.jwt", refreshToken = "app.refresh.jwt"))
+
+        mockMvc.perform(
+            get("/oauth/google/callback")
+                .param("code", "google-auth-code")
+                .param("state", "android-state"),
+        )
+            .andExpect(status().isFound)
+            .andExpect(
+                header().string(
+                    HttpHeaders.LOCATION,
+                    "moil://oauth/google/callback?state=android-state&accessToken=app.access.jwt&refreshToken=app.refresh.jwt",
+                ),
+            )
+    }
+
+    @Test
     fun `oauth callback redirects provider error to app without token exchange`() {
         mockMvc.perform(get("/oauth/kakao/callback").param("error", "access_denied"))
             .andExpect(status().isFound)
             .andExpect(header().string(HttpHeaders.LOCATION, "moil://oauth/kakao/callback?error=access_denied"))
+    }
+
+    @Test
+    fun `oauth callback includes state when redirecting provider error to app`() {
+        mockMvc.perform(
+            get("/oauth/kakao/callback")
+                .param("error", "access_denied")
+                .param("state", "android-state"),
+        )
+            .andExpect(status().isFound)
+            .andExpect(
+                header().string(
+                    HttpHeaders.LOCATION,
+                    "moil://oauth/kakao/callback?state=android-state&error=access_denied",
+                ),
+            )
     }
 
     @Test
@@ -74,6 +109,27 @@ class OauthControllerTest : IntegrationTestSupport() {
                 header().string(
                     HttpHeaders.LOCATION,
                     "moil://oauth/apple/callback?accessToken=apple.access.jwt&refreshToken=apple.refresh.jwt",
+                ),
+            )
+    }
+
+    @Test
+    fun `apple callback includes state when redirecting tokens to app`() {
+        val appleUser = """{"name":{"firstName":"Moil","lastName":"User"}}"""
+        whenever(oauthService.callback(SocialLoginType.APPLE, "apple-auth-code", appleUser))
+            .thenReturn(authTokenResponse(accessToken = "apple.access.jwt", refreshToken = "apple.refresh.jwt"))
+
+        mockMvc.perform(
+            post("/oauth/apple/callback")
+                .param("code", "apple-auth-code")
+                .param("user", appleUser)
+                .param("state", "android-state"),
+        )
+            .andExpect(status().isFound)
+            .andExpect(
+                header().string(
+                    HttpHeaders.LOCATION,
+                    "moil://oauth/apple/callback?state=android-state&accessToken=apple.access.jwt&refreshToken=apple.refresh.jwt",
                 ),
             )
     }

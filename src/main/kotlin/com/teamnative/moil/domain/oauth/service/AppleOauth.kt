@@ -24,16 +24,21 @@ class AppleOauth(
 ) {
     private val restClient = RestClient.create()
 
-    fun login(): String =
-        UriComponentsBuilder
+    fun login(state: String? = null): String {
+        val builder = UriComponentsBuilder
             .fromUriString("https://appleid.apple.com/auth/authorize")
             .queryParam("client_id", requireSetting(oauthProperties.apple.clientId, "APPLE_CLIENT_ID"))
             .queryParam("redirect_uri", oauthProperties.apple.redirectUri)
             .queryParam("response_type", "code")
             .queryParam("response_mode", "form_post")
             .queryParam("scope", "name email")
+
+        state?.let { builder.queryParam("state", it) }
+
+        return builder
             .encode()
             .toUriString()
+    }
 
     fun callback(code: String, user: String?): AuthTokenResponse {
         val token = requestToken(code)

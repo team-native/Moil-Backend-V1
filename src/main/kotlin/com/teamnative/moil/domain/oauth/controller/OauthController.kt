@@ -26,16 +26,20 @@ class OauthController(
     private val appLinkProperties: AppLinkProperties,
 ) {
     @GetMapping("/{socialLoginType}")
-    fun socialLogin(@PathVariable socialLoginType: SocialLoginType): RedirectView =
-        RedirectView(oauthService.login(socialLoginType))
+    fun socialLogin(
+        @PathVariable socialLoginType: SocialLoginType,
+        @RequestParam(required = false) state: String?,
+    ): RedirectView =
+        RedirectView(oauthService.login(socialLoginType, state))
 
     @GetMapping("/{socialLoginType}/callback")
     fun callback(
         @PathVariable socialLoginType: SocialLoginType,
         @RequestParam(required = false) code: String?,
         @RequestParam(required = false) error: String?,
+        @RequestParam(required = false) state: String?,
     ): ResponseEntity<Void> =
-        redirectToApp(socialLoginType, code, error, user = null)
+        redirectToApp(socialLoginType, code, error, user = null, state)
 
     @PostMapping("/{socialLoginType}/token")
     fun token(
@@ -48,36 +52,39 @@ class OauthController(
         )
 
     @GetMapping("/apple")
-    fun appleLogin(): RedirectView =
-        RedirectView(oauthService.appleLogin())
+    fun appleLogin(@RequestParam(required = false) state: String?): RedirectView =
+        RedirectView(oauthService.appleLogin(state))
 
     @PostMapping("/apple/callback")
     fun appleCallback(
         @RequestParam(required = false) code: String?,
         @RequestParam(required = false) user: String?,
         @RequestParam(required = false) error: String?,
+        @RequestParam(required = false) state: String?,
     ): ResponseEntity<Void> =
-        redirectToApp(SocialLoginType.APPLE, code, error, user)
+        redirectToApp(SocialLoginType.APPLE, code, error, user, state)
 
     private fun redirectToApp(
         socialLoginType: SocialLoginType,
         code: String?,
         error: String?,
         user: String?,
+        state: String?,
     ): ResponseEntity<Void> {
         val provider = socialLoginType.name.lowercase()
         val location = when {
-            error != null -> appLinkProperties.oauthCallbackErrorUri(provider, error)
-            code == null -> appLinkProperties.oauthCallbackErrorUri(provider, "missing_code")
+            error != null -> appLinkProperties.oauthCallbackErrorUri(provider, error, state = state)
+            code == null -> appLinkProperties.oauthCallbackErrorUri(provider, "missing_code", state = state)
             else -> runCatching {
                 oauthService.callback(socialLoginType, code, user)
             }.fold(
-                onSuccess = { token -> appLinkProperties.oauthCallbackTokenUri(provider, token) },
+                onSuccess = { token -> appLinkProperties.oauthCallbackTokenUri(provider, token, state) },
                 onFailure = { exception ->
                     appLinkProperties.oauthCallbackErrorUri(
                         provider = provider,
                         error = "oauth_failed",
                         description = exception.message ?: "Social login failed.",
+                        state = state,
                     )
                 },
             )

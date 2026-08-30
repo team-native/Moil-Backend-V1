@@ -19,14 +19,19 @@ class KakaoOauth(
 ) {
     private val restClient = RestClient.create()
 
-    fun login(): String =
-        UriComponentsBuilder
+    fun login(state: String? = null): String {
+        val builder = UriComponentsBuilder
             .fromUriString("https://kauth.kakao.com/oauth/authorize")
             .queryParam("client_id", requireSetting(oauthProperties.kakao.clientId, "KAKAO_CLIENT_ID"))
             .queryParam("redirect_uri", oauthProperties.kakao.redirectUri)
             .queryParam("response_type", "code")
+
+        state?.let { builder.queryParam("state", it) }
+
+        return builder
             .encode()
             .toUriString()
+    }
 
     fun callback(code: String): AuthTokenResponse {
         val token = requestToken(code)
