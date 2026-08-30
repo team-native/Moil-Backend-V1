@@ -1,5 +1,6 @@
 package com.teamnative.moil.global.config
 
+import com.teamnative.moil.domain.auth.dto.AuthTokenResponse
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.web.util.UriComponentsBuilder
 
@@ -24,11 +25,29 @@ data class AppLinkProperties(
             .toUriString()
     }
 
-    fun oauthCallbackErrorUri(provider: String, error: String): String =
-        UriComponentsBuilder
-            .fromUriString(oauthCallbackTemplate.replace("{provider}", provider))
-            .queryParam("error", error)
+    fun oauthCallbackTokenUri(provider: String, token: AuthTokenResponse): String =
+        baseOauthCallbackUri(provider)
+            .queryParam("accessToken", token.accessToken)
+            .queryParam("refreshToken", token.refreshToken)
             .build()
             .encode()
             .toUriString()
+
+    fun oauthCallbackErrorUri(provider: String, error: String, description: String? = null): String {
+        val builder = baseOauthCallbackUri(provider)
+            .queryParam("error", error)
+
+        description?.takeIf { it.isNotBlank() }?.let {
+            builder.queryParam("error_description", it)
+        }
+
+        return builder
+            .build()
+            .encode()
+            .toUriString()
+    }
+
+    private fun baseOauthCallbackUri(provider: String): UriComponentsBuilder =
+        UriComponentsBuilder
+            .fromUriString(oauthCallbackTemplate.replace("{provider}", provider))
 }

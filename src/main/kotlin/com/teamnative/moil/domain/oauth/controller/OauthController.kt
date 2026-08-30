@@ -66,10 +66,21 @@ class OauthController(
         user: String?,
     ): ResponseEntity<Void> {
         val provider = socialLoginType.name.lowercase()
-        val location = if (code != null) {
-            appLinkProperties.oauthCallbackUri(provider, code, user)
-        } else {
-            appLinkProperties.oauthCallbackErrorUri(provider, error ?: "missing_code")
+        val location = when {
+            error != null -> appLinkProperties.oauthCallbackErrorUri(provider, error)
+            code == null -> appLinkProperties.oauthCallbackErrorUri(provider, "missing_code")
+            else -> runCatching {
+                oauthService.callback(socialLoginType, code, user)
+            }.fold(
+                onSuccess = { token -> appLinkProperties.oauthCallbackTokenUri(provider, token) },
+                onFailure = { exception ->
+                    appLinkProperties.oauthCallbackErrorUri(
+                        provider = provider,
+                        error = "oauth_failed",
+                        description = exception.message ?: "Social login failed.",
+                    )
+                },
+            )
         }
 
         return ResponseEntity
