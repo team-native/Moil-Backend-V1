@@ -25,13 +25,17 @@ import com.teamnative.moil.domain.auth.service.SignupService
 import com.teamnative.moil.domain.auth.service.TokenRefreshService
 import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
+import org.springframework.http.MediaType
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.RequestHeader
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import org.springframework.web.server.ResponseStatusException
+import org.springframework.http.HttpStatus
 
 @RestController
 @RequestMapping("/auth")
@@ -128,15 +132,20 @@ class AuthController(
         return ApiResponse.empty("로그아웃되었습니다.")
     }
 
-    @PostMapping("/refresh")
+    @PostMapping("/refresh", consumes = [MediaType.APPLICATION_JSON_VALUE])
     fun refresh(
         @RequestHeader("Authorization", required = false) authorization: String?,
         @Valid @RequestBody request: RefreshTokenRequest,
     ): ApiResponse<RefreshTokenResponse> =
-        ApiResponse.success(
-            message = "토큰이 재발급되었습니다.",
-            data = tokenRefreshService.refresh(authorization, request.refreshToken),
-        )
+        refreshToken(authorization, request.refreshToken)
+
+    @PostMapping("/refresh", consumes = [MediaType.APPLICATION_FORM_URLENCODED_VALUE])
+    fun refreshForm(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @RequestParam("refresh_token", required = false) refreshToken: String?,
+        @RequestParam("refreshToken", required = false) camelRefreshToken: String?,
+    ): ApiResponse<RefreshTokenResponse> =
+        refreshToken(authorization, refreshToken ?: camelRefreshToken)
 
     @PostMapping("/delete-account")
     fun deleteAccount(
@@ -147,5 +156,18 @@ class AuthController(
         deleteAccountService.delete(user, request.email, request.password, request.leftData!!)
 
         return ApiResponse.empty("회원 탈퇴가 완료되었습니다.")
+    }
+
+    private fun refreshToken(
+        authorization: String?,
+        refreshToken: String?,
+    ): ApiResponse<RefreshTokenResponse> {
+        val token = refreshToken?.takeIf { it.isNotBlank() }
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "리프레시 토큰을 입력해주세요.")
+
+        return ApiResponse.success(
+            message = "토큰이 재발급되었습니다.",
+            data = tokenRefreshService.refresh(authorization, token),
+        )
     }
 }

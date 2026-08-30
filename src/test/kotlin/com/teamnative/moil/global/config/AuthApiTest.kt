@@ -374,6 +374,51 @@ class AuthApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `refresh token accepts camel case json request`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/refresh")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"refreshToken":"${session.refreshToken}"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.accessToken").value(session.accessToken))
+            .andExpect(jsonPath("$.data.refreshToken").value(session.refreshToken))
+    }
+
+    @Test
+    fun `refresh token accepts form url encoded request`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/refresh")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("refresh_token", session.refreshToken),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.accessToken").value(session.accessToken))
+            .andExpect(jsonPath("$.data.refreshToken").value(session.refreshToken))
+    }
+
+    @Test
+    fun `refresh token accepts camel case form url encoded request`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            post("/auth/refresh")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .param("refreshToken", session.refreshToken),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.accessToken").value(session.accessToken))
+            .andExpect(jsonPath("$.data.refreshToken").value(session.refreshToken))
+    }
+
+    @Test
     fun `refresh token replaces expired access token once`() {
         val session = createLoginSession(password = "password", expired = true)
 
