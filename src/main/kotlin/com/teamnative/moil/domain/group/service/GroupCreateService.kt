@@ -25,7 +25,7 @@ class GroupCreateService(
 
     @Transactional
     fun create(user: UserAccount, name: String, nickname: String, profile: ProfileSelection): CreateGroupResponse {
-        val group = groupRepository.save(
+        val group = groupRepository.saveAndFlush(
             Group(
                 name = name,
                 inviteCode = generateInviteCode(),
@@ -34,7 +34,7 @@ class GroupCreateService(
         )
         val imagePath = profile.imagePath?.let { imageService.materializeOwnedImagePath(user, it) }
 
-        groupMemberRepository.save(
+        groupMemberRepository.saveAndFlush(
             GroupMember(
                 groupId = group.id,
                 userId = user.id,

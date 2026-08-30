@@ -91,6 +91,48 @@ class GroupApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `created group can immediately return owner member and empty monthly events`() {
+        val session = createLoginSession(password = "password")
+        val groupName = "Fresh Group ${UUID.randomUUID()}"
+
+        val createResult = mockMvc.perform(
+            post("/groups")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"$groupName","nickname":"Owner","colorId":"GREEN"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.inviteCode").exists())
+            .andReturn()
+
+        val groupId = objectMapper
+            .readTree(createResult.response.contentAsString)
+            .path("data")
+            .path("groupId")
+            .asLong()
+
+        mockMvc.perform(
+            get("/groups/$groupId/members")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data[0].userId").value(session.userId))
+            .andExpect(jsonPath("$.data[0].nickname").value("Owner"))
+            .andExpect(jsonPath("$.data[0].role").value("admin"))
+            .andExpect(jsonPath("$.data[0].colorId").value("GREEN"))
+            .andExpect(jsonPath("$.data[0].isMe").value(true))
+            .andExpect(jsonPath("$.data[1]").doesNotExist())
+
+        mockMvc.perform(
+            get("/groups/$groupId/events")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .param("month", "2026-08"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.length()").value(0))
+    }
+
+    @Test
     fun `profile color palette includes rainbow and spring colors`() {
         val expectedColorIds = listOf(
             "RED",
