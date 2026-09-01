@@ -1,5 +1,6 @@
 package com.teamnative.moil.domain.oauth.service
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties
 import com.fasterxml.jackson.annotation.JsonProperty
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
@@ -106,6 +107,7 @@ class AppleIdTokenVerifier(
         val email: String?,
     )
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     data class AppleTokenHeader(
         val kid: String,
     )
