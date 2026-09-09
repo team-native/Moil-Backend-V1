@@ -19,6 +19,7 @@ import java.util.UUID
 class ImageService(
     private val profileImageRepository: ProfileImageRepository,
     private val pendingProfileImageRepository: PendingProfileImageRepository,
+    private val profileColorExtractor: ProfileColorExtractor,
     private val clock: Clock,
 ) {
 
@@ -82,6 +83,18 @@ class ImageService(
         }
 
         return imagePath(key)
+    }
+
+    @Transactional(readOnly = true)
+    fun colorForOwnedImagePath(user: UserAccount, imagePath: String): String {
+        val key = parseKey(imagePath)
+            ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid image path")
+        requireOwnedImagePath(user, imagePath)
+
+        val bytes = profileImageRepository.findByKey(key)?.image
+            ?: pendingProfileImageRepository.findByKey(key)?.image
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Image not found")
+        return profileColorExtractor.extract(bytes)
     }
 
     /**
