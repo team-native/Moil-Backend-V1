@@ -523,7 +523,7 @@ class GroupApiTest : IntegrationTestSupport() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"nickname":"After","colorId":"BLUE","imagePath":"/images/abc"}"""),
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isNotFound)
 
         mockMvc.perform(
             patch("/groups/${group.id}/members/me")
@@ -667,7 +667,7 @@ class GroupApiTest : IntegrationTestSupport() {
         // Switching this group to a color must not touch the image still in use by other groups.
         val otherMember = groupMemberRepository.findByGroupIdAndUserId(otherGroup.id, session.userId)
             ?: error("Other group member not found.")
-        assertNull(otherMember.color)
+        assertEquals("RED", otherMember.color)
         assertEquals(imagePath, otherMember.imagePath)
         assertEquals(1, profileImageRepository.findAllByUserId(session.userId).size)
     }

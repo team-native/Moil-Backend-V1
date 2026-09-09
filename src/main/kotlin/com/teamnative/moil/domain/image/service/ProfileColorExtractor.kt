@@ -4,6 +4,7 @@ import com.teamnative.moil.global.model.MoilColor
 import org.springframework.stereotype.Component
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
+import java.io.IOException
 import javax.imageio.ImageIO
 import kotlin.math.roundToInt
 
@@ -12,12 +13,20 @@ import kotlin.math.roundToInt
 class ProfileColorExtractor {
 
     fun extract(imageBytes: ByteArray): String {
-        val image = ImageIO.read(ByteArrayInputStream(imageBytes)) ?: return FALLBACK_COLOR
+        val image = try {
+            ImageIO.read(ByteArrayInputStream(imageBytes))
+        } catch (_: IOException) {
+            null
+        } ?: return FALLBACK_COLOR
         val pixels = collectPixels(image)
         if (pixels.isEmpty()) return FALLBACK_COLOR
 
         val centroid = largestClusterCentroid(pixels)
-        return MoilColor.nearest(centroid.red, centroid.green, centroid.blue).id
+        return MoilColor.nearest(
+            centroid.red.roundToInt(),
+            centroid.green.roundToInt(),
+            centroid.blue.roundToInt(),
+        ).id
     }
 
     private fun collectPixels(image: BufferedImage): List<Pixel> {
@@ -28,7 +37,13 @@ class ProfileColorExtractor {
                 for (x in 0 until image.width step step) {
                     val argb = image.getRGB(x, y)
                     if ((argb ushr 24) >= MIN_ALPHA) {
-                        add(Pixel(argb shr 16 and 0xff, argb shr 8 and 0xff, argb and 0xff))
+                        add(
+                            Pixel(
+                                (argb shr 16 and 0xff).toDouble(),
+                                (argb shr 8 and 0xff).toDouble(),
+                                (argb and 0xff).toDouble(),
+                            ),
+                        )
                     }
                 }
             }
