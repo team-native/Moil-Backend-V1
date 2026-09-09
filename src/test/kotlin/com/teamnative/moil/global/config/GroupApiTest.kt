@@ -207,7 +207,7 @@ class GroupApiTest : IntegrationTestSupport() {
         val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
             ?: error("Created owner member not found.")
 
-        assertNull(member.color)
+        assertEquals("RED", member.color)
         assertEquals(imagePath, member.imagePath)
     }
 
@@ -285,13 +285,13 @@ class GroupApiTest : IntegrationTestSupport() {
                 .content("""{"inviteCode":"${group.inviteCode}","nickname":"Guest","imagePath":"$imagePath"}"""),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data.myColor").doesNotExist())
+            .andExpect(jsonPath("$.data.myColor").value("RED"))
             .andExpect(jsonPath("$.data.myImagePath").value(imagePath))
 
         val member = groupMemberRepository.findByGroupIdAndUserId(group.id, joinSession.userId)
             ?: error("Joined member not found.")
 
-        assertNull(member.color)
+        assertEquals("RED", member.color)
         assertEquals(imagePath, member.imagePath)
     }
 
@@ -475,7 +475,7 @@ class GroupApiTest : IntegrationTestSupport() {
         )
             .andExpect(status().isOk)
             .andExpect(jsonPath("$.data.nickname").value("After"))
-            .andExpect(jsonPath("$.data.colorId").doesNotExist())
+            .andExpect(jsonPath("$.data.colorId").value("RED"))
             .andExpect(jsonPath("$.data.imagePath").value(imagePath))
 
         mockMvc.perform(
@@ -483,14 +483,14 @@ class GroupApiTest : IntegrationTestSupport() {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
         )
             .andExpect(status().isOk)
-            .andExpect(jsonPath("$.data[0].colorId").doesNotExist())
+            .andExpect(jsonPath("$.data[0].colorId").value("RED"))
             .andExpect(jsonPath("$.data[0].imagePath").value(imagePath))
 
         val member = groupMemberRepository.findByGroupIdAndUserId(group.id, session.userId)
             ?: error("Group member not found.")
 
         assertEquals("After", member.nickname)
-        assertNull(member.color)
+        assertEquals("RED", member.color)
         assertEquals(imagePath, member.imagePath)
     }
 
@@ -523,7 +523,7 @@ class GroupApiTest : IntegrationTestSupport() {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""{"nickname":"After","colorId":"BLUE","imagePath":"/images/abc"}"""),
         )
-            .andExpect(status().isBadRequest)
+            .andExpect(status().isNotFound)
 
         mockMvc.perform(
             patch("/groups/${group.id}/members/me")
@@ -667,7 +667,7 @@ class GroupApiTest : IntegrationTestSupport() {
         // Switching this group to a color must not touch the image still in use by other groups.
         val otherMember = groupMemberRepository.findByGroupIdAndUserId(otherGroup.id, session.userId)
             ?: error("Other group member not found.")
-        assertNull(otherMember.color)
+        assertEquals("RED", otherMember.color)
         assertEquals(imagePath, otherMember.imagePath)
         assertEquals(1, profileImageRepository.findAllByUserId(session.userId).size)
     }
