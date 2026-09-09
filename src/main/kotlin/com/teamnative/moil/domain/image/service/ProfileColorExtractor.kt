@@ -55,7 +55,7 @@ class ProfileColorExtractor {
         var centroids = initialCentroids(pixels, clusterCount)
         var assignments = IntArray(pixels.size)
 
-        repeat(MAX_ITERATIONS) {
+        for (iteration in 0 until MAX_ITERATIONS) {
             val nextAssignments = IntArray(pixels.size) { index ->
                 centroids.indices.minBy { distance(pixels[index], centroids[it]) }
             }
@@ -63,13 +63,13 @@ class ProfileColorExtractor {
                 val members = pixels.indices.filter { nextAssignments[it] == cluster }
                 if (members.isEmpty()) centroids[cluster]
                 else Pixel(
-                    members.sumOf { pixels[it].red }.toDouble() / members.size,
-                    members.sumOf { pixels[it].green }.toDouble() / members.size,
-                    members.sumOf { pixels[it].blue }.toDouble() / members.size,
+                    members.sumOf { pixels[it].red } / members.size,
+                    members.sumOf { pixels[it].green } / members.size,
+                    members.sumOf { pixels[it].blue } / members.size,
                 )
             }
             assignments = nextAssignments
-            if (nextCentroids == centroids) return@repeat
+            if (nextCentroids == centroids) break
             centroids = nextCentroids
         }
 
