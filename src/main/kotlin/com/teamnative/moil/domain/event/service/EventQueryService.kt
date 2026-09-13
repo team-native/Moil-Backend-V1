@@ -113,6 +113,7 @@ class EventQueryService(
         val start = startsAt.atZone(zone)
         val end = endsAt.atZone(zone)
         val creator = userAccountRepository.findById(creatorId).orElse(null)
+        val creatorProfile = groupMemberRepository.findByGroupIdAndUserId(groupId, creatorId)
 
         return EventCalendarResponse(
             eventId = id,
@@ -126,8 +127,8 @@ class EventQueryService(
                     EventMemberResponse(
                         userId = creatorId,
                         nickname = creator?.name.orEmpty(),
-                        colorId = DEFAULT_PROFILE_COLOR,
-                        imagePath = null,
+                        colorId = creatorProfile?.color ?: DEFAULT_PROFILE_COLOR,
+                        imagePath = creatorProfile?.imagePath,
                     ),
                 )
             },
