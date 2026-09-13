@@ -20,7 +20,7 @@ data class ProfileImage(
     val key: String,
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGBLOB")
     val image: ByteArray,
 
     @Column(nullable = false)

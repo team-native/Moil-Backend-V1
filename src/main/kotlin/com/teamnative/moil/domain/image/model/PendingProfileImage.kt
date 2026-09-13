@@ -24,7 +24,7 @@ data class PendingProfileImage(
     val key: String,
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGBLOB")
     val image: ByteArray,
 
     @Column(nullable = false, length = 100)
