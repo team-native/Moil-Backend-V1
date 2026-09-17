@@ -35,7 +35,7 @@ class ImageService(
         }
 
         if (image.size > MAX_IMAGE_SIZE_BYTES) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 2MB 이하로 업로드해야 합니다.")
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "이미지는 10MB 이하로 업로드해야 합니다.")
         }
 
         val bytes = image.bytes
@@ -191,7 +191,7 @@ class ImageService(
 
     companion object {
         private const val IMAGE_PATH_PREFIX = "/images/"
-        private const val MAX_IMAGE_SIZE_BYTES = 2 * 1024 * 1024
+        private const val MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
         private const val WEBP_FORMAT_OFFSET = 8
         private const val WEBP_HEADER_SIZE = 12
 

@@ -16,6 +16,8 @@ import org.springframework.http.converter.HttpMessageNotReadableException
 import org.springframework.web.bind.MethodArgumentNotValidException
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
+import org.springframework.web.multipart.MaxUploadSizeExceededException
+import org.springframework.web.multipart.MultipartException
 import org.springframework.web.server.ResponseStatusException
 import org.springframework.web.servlet.resource.NoResourceFoundException
 import java.net.URLDecoder
@@ -65,6 +67,40 @@ class GlobalExceptionHandler(
         return ResponseEntity
             .status(HttpStatus.NOT_FOUND)
             .body(ApiResponse.failure(HttpStatus.NOT_FOUND.value(), message))
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException::class)
+    fun handleMaxUploadSizeExceededException(
+        exception: MaxUploadSizeExceededException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiResponse<Nothing>> {
+        val status = HttpStatus.PAYLOAD_TOO_LARGE
+        val message = "이미지는 10MB 이하로 업로드해야 합니다."
+        logException(exception, status, message, request)
+
+        return ResponseEntity
+            .status(status)
+            .body(ApiResponse.failure(status.value(), message))
+    }
+
+    @ExceptionHandler(MultipartException::class)
+    fun handleMultipartException(
+        exception: MultipartException,
+        request: HttpServletRequest,
+    ): ResponseEntity<ApiResponse<Nothing>> {
+        val isSizeLimitExceeded = generateSequence(exception as Throwable?) { it.cause }
+            .any { it::class.simpleName == "FileSizeLimitExceededException" }
+        val status = if (isSizeLimitExceeded) HttpStatus.PAYLOAD_TOO_LARGE else HttpStatus.BAD_REQUEST
+        val message = if (isSizeLimitExceeded) {
+            "이미지는 10MB 이하로 업로드해야 합니다."
+        } else {
+            "요청 형식이 올바르지 않습니다."
+        }
+        logException(exception, status, message, request)
+
+        return ResponseEntity
+            .status(status)
+            .body(ApiResponse.failure(status.value(), message))
     }
 
     @ExceptionHandler(ResponseStatusException::class)
