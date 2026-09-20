@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
+import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -24,6 +25,7 @@ class AvailabilityCommandService(
     private val eventSharedMemberRepository: EventSharedMemberRepository,
     private val eventAvailabilityRepository: EventAvailabilityRepository,
     private val eventAvailabilitySlotRepository: EventAvailabilitySlotRepository,
+    private val clock: Clock,
 ) {
 
     @Transactional
@@ -43,14 +45,14 @@ class AvailabilityCommandService(
                 throw badRequest("시작 시간은 종료 시간보다 빨라야 합니다.")
             }
             AvailabilityRange(startTime, endTime)
-        }
+        }.let(::mergeRanges)
 
         val existing = eventAvailabilityRepository.findByEventIdAndUserIdAndAvailableDate(
             eventId = eventId,
             userId = userId,
             availableDate = availableDate,
         )
-        val now = Instant.now()
+        val now = Instant.now(clock)
         val availability = eventAvailabilityRepository.save(
             existing?.copy(updatedAt = now)
                 ?: EventAvailability(
@@ -115,6 +117,27 @@ class AvailabilityCommandService(
 
     private fun toInstant(date: LocalDate, time: LocalTime): Instant =
         LocalDateTime.of(date, time).atZone(ZONE_ID).toInstant()
+
+    private fun mergeRanges(ranges: List<AvailabilityRange>): List<AvailabilityRange> {
+        if (ranges.isEmpty()) {
+            return emptyList()
+        }
+
+        val sorted = ranges
+            .sortedWith(compareBy<AvailabilityRange> { it.startTime }.thenBy { it.endTime })
+
+        return sorted.drop(1).fold(mutableListOf(sorted.first())) { merged, current ->
+                val previous = merged.last()
+                if (current.startTime <= previous.endTime) {
+                    merged[merged.lastIndex] = previous.copy(
+                        endTime = maxOf(previous.endTime, current.endTime),
+                    )
+                } else {
+                    merged += current
+                }
+                merged
+            }
+    }
 
     private fun badRequest(message: String) =
         ResponseStatusException(HttpStatus.BAD_REQUEST, message)

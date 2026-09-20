@@ -132,9 +132,13 @@ class AvailabilityQueryService(
     }
 
     private fun slotsByAvailability(availabilityIds: Collection<Long>) =
-        eventAvailabilitySlotRepository
-            .findAllByAvailabilityIdInOrderByStartsAtAsc(availabilityIds)
-            .groupBy { it.availabilityId }
+        if (availabilityIds.isEmpty()) {
+            emptyMap()
+        } else {
+            eventAvailabilitySlotRepository
+                .findAllByAvailabilityIdInOrderByStartsAtAsc(availabilityIds)
+                .groupBy { it.availabilityId }
+        }
 
     private fun toTimeSlotResponse(slot: com.teamnative.moil.domain.availability.model.EventAvailabilitySlot) =
         AvailabilityTimeSlotResponse(

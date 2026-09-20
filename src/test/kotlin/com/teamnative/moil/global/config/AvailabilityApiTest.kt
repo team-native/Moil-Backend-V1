@@ -132,6 +132,45 @@ class AvailabilityApiTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `availability api merges overlapping slots before storing`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Availability Merge Group")
+        addMember(group.id, session.userId, "엄", "RED")
+        val event = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "Schedule",
+            startsAt = Instant.parse("2026-09-20T00:00:00Z"),
+            endsAt = Instant.parse("2026-09-21T00:00:00Z"),
+        )
+        eventSharedMemberRepository.save(
+            EventSharedMember(eventId = event.id, userId = session.userId, createdAt = Instant.now()),
+        )
+
+        mockMvc.perform(
+            put("/events/${event.id}/availability")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"date":"2026-09-20","timeSlots":[{"startTime":"12:00","endTime":"13:00"},{"startTime":"12:30","endTime":"14:00"}]}
+                    """.trimIndent(),
+                ),
+        )
+            .andExpect(status().isOk)
+
+        mockMvc.perform(
+            get("/events/${event.id}/availability/me")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .param("date", "2026-09-20"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.timeSlots.length()").value(1))
+            .andExpect(jsonPath("$.data.timeSlots[0].startTime").value("12:00"))
+            .andExpect(jsonPath("$.data.timeSlots[0].endTime").value("14:00"))
+    }
+
+    @Test
     fun `availability api rejects invalid time and non participant`() {
         val session = createLoginSession(password = "password")
         val outsider = createLoginSession(password = "password")
@@ -168,6 +207,33 @@ class AvailabilityApiTest : IntegrationTestSupport() {
         )
             .andExpect(status().isForbidden)
             .andExpect(jsonPath("$.status").value(403))
+    }
+
+    @Test
+    fun `availability summary returns empty slots when nobody has responded`() {
+        val session = createLoginSession(password = "password")
+        val group = createGroup(name = "Empty Availability Group")
+        addMember(group.id, session.userId, "엄", "RED")
+        val event = createEvent(
+            groupId = group.id,
+            userId = session.userId,
+            title = "Schedule",
+            startsAt = Instant.parse("2026-09-20T00:00:00Z"),
+            endsAt = Instant.parse("2026-09-21T00:00:00Z"),
+        )
+        eventSharedMemberRepository.save(
+            EventSharedMember(eventId = event.id, userId = session.userId, createdAt = Instant.now()),
+        )
+
+        mockMvc.perform(
+            get("/events/${event.id}/availability/summary")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .param("date", "2026-09-20"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.participantCount").value(1))
+            .andExpect(jsonPath("$.data.respondedCount").value(0))
+            .andExpect(jsonPath("$.data.timeSlots.length()").value(0))
     }
 
     private fun saveAvailability(eventId: Long, accessToken: String, start: String, end: String) {
