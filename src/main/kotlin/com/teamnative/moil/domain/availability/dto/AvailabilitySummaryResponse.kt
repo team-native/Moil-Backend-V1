@@ -1,5 +1,7 @@
 package com.teamnative.moil.domain.availability.dto
 
+import com.fasterxml.jackson.annotation.JsonProperty
+
 data class AvailabilitySummaryResponse(
     val eventId: Long,
     val date: String,
@@ -13,5 +15,6 @@ data class AvailabilitySummarySlotResponse(
     val endTime: String,
     val availableCount: Int,
     val availableMemberIds: List<Long>,
+    @get:JsonProperty("isAvailableForEveryone")
     val isAvailableForEveryone: Boolean,
 )
