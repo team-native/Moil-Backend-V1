@@ -8,6 +8,8 @@ data class EventCalendarResponse(
     val location: String?,
     val memo: String?,
     val members: List<EventMemberResponse>,
+    val myAttendanceStatus: com.teamnative.moil.domain.event.model.EventAttendanceStatus?,
+    val attendingCount: Int,
 )
 
 data class EventMemberResponse(

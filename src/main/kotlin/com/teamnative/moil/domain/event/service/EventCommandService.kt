@@ -3,6 +3,10 @@ package com.teamnative.moil.domain.event.service
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.event.model.Event
 import com.teamnative.moil.domain.event.model.EventSharedMember
+import com.teamnative.moil.domain.event.model.EventAttendance
+import com.teamnative.moil.domain.event.model.EventAttendanceStatus
+import com.teamnative.moil.domain.event.dto.EventAttendanceResponse
+import com.teamnative.moil.domain.event.repository.EventAttendanceRepository
 import com.teamnative.moil.domain.event.repository.EventRepository
 import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
@@ -25,6 +29,7 @@ class EventCommandService(
     private val clock: Clock,
     private val groupMemberRepository: GroupMemberRepository,
     private val eventSharedMemberRepository: EventSharedMemberRepository,
+    private val eventAttendanceRepository: EventAttendanceRepository,
 ) {
 
     @Transactional
@@ -164,7 +169,39 @@ class EventCommandService(
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "Event not found.")
 
         eventSharedMemberRepository.deleteByEventId(event.id)
+        eventAttendanceRepository.deleteByEventId(event.id)
         eventRepository.delete(event)
+    }
+
+    @Transactional
+    fun updateAttendance(user: UserAccount, eventId: Long, rawStatus: String?): EventAttendanceResponse {
+        val event = eventRepository.findById(eventId).orElse(null)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다.")
+        requireParticipant(event, user.id)
+        val status = runCatching { EventAttendanceStatus.valueOf(rawStatus.orEmpty()) }
+            .getOrElse { throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid attendance status.") }
+        val updatedAt = Instant.now(clock)
+        val current = eventAttendanceRepository.findByEventIdAndUserId(eventId, user.id)
+        eventAttendanceRepository.save(
+            current?.copy(status = status, updatedAt = updatedAt)
+                ?: EventAttendance(eventId = eventId, userId = user.id, status = status, updatedAt = updatedAt),
+        )
+
+        return EventAttendanceResponse(status = status, updatedAt = updatedAt)
+    }
+
+    @Transactional
+    fun deleteAttendance(user: UserAccount, eventId: Long) {
+        val event = eventRepository.findById(eventId).orElse(null)
+            ?: throw ResponseStatusException(HttpStatus.NOT_FOUND, "일정을 찾을 수 없습니다.")
+        requireParticipant(event, user.id)
+        eventAttendanceRepository.findByEventIdAndUserId(eventId, user.id)?.let(eventAttendanceRepository::delete)
+    }
+
+    private fun requireParticipant(event: Event, userId: Long) {
+        if (eventSharedMemberRepository.findAllByEventId(event.id).none { it.userId == userId }) {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "일정 참여 대상만 참석 여부를 변경할 수 있습니다.")
+        }
     }
 
     private fun replaceSharedMembers(eventId: Long, groupId: Long, userIds: List<Long>) {

@@ -4,6 +4,7 @@ import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
 import com.teamnative.moil.domain.auth.repository.UserAccountRepository
 import com.teamnative.moil.domain.event.repository.EventRepository
+import com.teamnative.moil.domain.event.repository.EventAttendanceRepository
 import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.model.GroupRole
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
@@ -22,6 +23,7 @@ class DeleteAccountService(
     private val userAccountRepository: UserAccountRepository,
     private val loginSessionRepository: LoginSessionRepository,
     private val eventRepository: EventRepository,
+    private val eventAttendanceRepository: EventAttendanceRepository,
     private val eventSharedMemberRepository: EventSharedMemberRepository,
     private val groupRepository: GroupRepository,
     private val groupMemberRepository: GroupMemberRepository,
@@ -60,14 +62,17 @@ class DeleteAccountService(
 
         val createdEventIds = eventRepository.findAllByCreatorId(user.id).map { it.id }
         if (createdEventIds.isNotEmpty()) {
+            eventAttendanceRepository.deleteByEventIdIn(createdEventIds)
             eventSharedMemberRepository.deleteByEventIdIn(createdEventIds)
             eventRepository.deleteByCreatorId(user.id)
         }
+        eventAttendanceRepository.deleteByUserId(user.id)
         eventSharedMemberRepository.deleteByUserId(user.id)
 
         if (ownedGroupIds.isNotEmpty()) {
             val ownedGroupEventIds = eventRepository.findAllByGroupIdIn(ownedGroupIds).map { it.id }
             if (ownedGroupEventIds.isNotEmpty()) {
+                eventAttendanceRepository.deleteByEventIdIn(ownedGroupEventIds)
                 eventSharedMemberRepository.deleteByEventIdIn(ownedGroupEventIds)
             }
             eventRepository.deleteByGroupIdIn(ownedGroupIds)
@@ -105,6 +110,7 @@ class DeleteAccountService(
             if (nextOwner == null) {
                 val groupEventIds = eventRepository.findAllByGroupIdIn(listOf(owner.groupId)).map { it.id }
                 if (groupEventIds.isNotEmpty()) {
+                    eventAttendanceRepository.deleteByEventIdIn(groupEventIds)
                     eventSharedMemberRepository.deleteByEventIdIn(groupEventIds)
                 }
                 eventRepository.deleteByGroupIdIn(listOf(owner.groupId))

@@ -4,6 +4,9 @@ import com.teamnative.moil.domain.auth.service.AuthenticatedUserService
 import com.teamnative.moil.domain.event.dto.CreateEventResponse
 import com.teamnative.moil.domain.event.dto.CreateEventRequest
 import com.teamnative.moil.domain.event.dto.EventDetailResponse
+import com.teamnative.moil.domain.event.dto.EventAttendanceResponse
+import com.teamnative.moil.domain.event.dto.EventAttendanceSummaryResponse
+import com.teamnative.moil.domain.event.dto.UpdateEventAttendanceRequest
 import com.teamnative.moil.domain.event.dto.UpdateEventRequest
 import com.teamnative.moil.domain.event.service.EventCommandService
 import com.teamnative.moil.domain.event.service.EventQueryService
@@ -11,6 +14,7 @@ import com.teamnative.moil.global.dto.ApiResponse
 import jakarta.validation.Valid
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -65,6 +69,44 @@ class EventController(
         return ApiResponse.success(
             message = "그룹 일정을 조회했습니다.",
             data = eventQueryService.findEvent(user, eventId),
+        )
+    }
+
+    @PutMapping("/{eventId:[0-9]+}/attendance")
+    fun updateAttendance(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable eventId: Long,
+        @Valid @RequestBody request: UpdateEventAttendanceRequest,
+    ): ApiResponse<EventAttendanceResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "일정 참석 상태를 변경했습니다.",
+            data = eventCommandService.updateAttendance(user, eventId, request.status),
+        )
+    }
+
+    @DeleteMapping("/{eventId:[0-9]+}/attendance")
+    fun deleteAttendance(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable eventId: Long,
+    ): ApiResponse<Nothing> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+        eventCommandService.deleteAttendance(user, eventId)
+
+        return ApiResponse.empty("일정 참석 응답을 취소했습니다.")
+    }
+
+    @GetMapping("/{eventId:[0-9]+}/attendance")
+    fun attendance(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+        @PathVariable eventId: Long,
+    ): ApiResponse<EventAttendanceSummaryResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "일정 참석 현황을 조회했습니다.",
+            data = eventQueryService.findAttendance(user, eventId),
         )
     }
 
