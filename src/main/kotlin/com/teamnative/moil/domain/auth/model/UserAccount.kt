@@ -22,4 +22,10 @@ data class UserAccount(
 
     @Column(nullable = false)
     val passwordHash: String,
+
+    @Column(length = 50)
+    val defaultColorId: String? = null,
+
+    @Column(length = 512)
+    val defaultImagePath: String? = null,
 )

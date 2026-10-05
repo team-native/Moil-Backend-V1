@@ -119,7 +119,19 @@ class AuthController(
 
         return ApiResponse.success(
             message = "프로필이 변경되었습니다.",
-            data = profileService.update(user, request.name),
+            data = profileService.update(user, request.name, request.colorId, request.imagePath),
+        )
+    }
+
+    @GetMapping("/profile")
+    fun profile(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+    ): ApiResponse<ProfileResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "?꾨줈?꾩씠瑜?議고쉶?덉뒿?덈떎.",
+            data = profileService.get(user),
         )
     }
 
