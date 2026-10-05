@@ -13,6 +13,7 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
@@ -278,6 +279,52 @@ class AuthApiTest : IntegrationTestSupport() {
 
         val updatedUser = userAccountRepository.findById(session.userId).orElseThrow()
         assert(updatedUser.name == "updated-user")
+    }
+
+    @Test
+    fun `profile can be read and default color can be updated`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            get("/auth/profile")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}"),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.userId").value(session.userId))
+            .andExpect(jsonPath("$.data.defaultColorId").doesNotExist())
+            .andExpect(jsonPath("$.data.defaultImagePath").doesNotExist())
+
+        mockMvc.perform(
+            patch("/auth/profile")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"updated-user","colorId":"BLUE"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.defaultColorId").value("BLUE"))
+            .andExpect(jsonPath("$.data.defaultImagePath").doesNotExist())
+
+        mockMvc.perform(
+            patch("/auth/profile")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"renamed-user"}"""),
+        )
+            .andExpect(status().isOk)
+            .andExpect(jsonPath("$.data.defaultColorId").value("BLUE"))
+    }
+
+    @Test
+    fun `profile rejects unknown default color`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            patch("/auth/profile")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"name":"updated-user","colorId":"UNKNOWN"}"""),
+        )
+            .andExpect(status().isBadRequest)
     }
 
     @Test
