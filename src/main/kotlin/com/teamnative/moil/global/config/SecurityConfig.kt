@@ -27,6 +27,7 @@ class SecurityConfig {
                         "/health",
                         "/actuator/health",
                         "/auth/**",
+                        "/users/me/device-token",
                         "/join/**",
                         "/groups/**",
                         "/events/**",

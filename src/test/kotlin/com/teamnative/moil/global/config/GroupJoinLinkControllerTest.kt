@@ -14,9 +14,17 @@ class GroupJoinLinkControllerTest : IntegrationTestSupport() {
 
     @Test
     fun `group join link redirects to app join activity`() {
-        mockMvc.perform(get("/join/123"))
+        val group = createGroup(name = "Join Link Group")
+
+        mockMvc.perform(get("/join/${group.id}"))
             .andExpect(status().isFound)
-            .andExpect(header().string(HttpHeaders.LOCATION, "moil://join/123"))
+            .andExpect(header().string(HttpHeaders.LOCATION, "moil://join/${group.id}?code=${group.inviteCode}"))
+    }
+
+    @Test
+    fun `group join link returns not found when group does not exist`() {
+        mockMvc.perform(get("/join/999999"))
+            .andExpect(status().isNotFound)
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.teamnative.moil.domain.auth.service
 import com.teamnative.moil.domain.auth.model.UserAccount
 import com.teamnative.moil.domain.auth.repository.LoginSessionRepository
 import com.teamnative.moil.domain.auth.repository.UserAccountRepository
+import com.teamnative.moil.domain.auth.repository.UserDeviceTokenRepository
 import com.teamnative.moil.domain.event.repository.EventRepository
 import com.teamnative.moil.domain.event.repository.EventAttendanceRepository
 import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
@@ -21,6 +22,7 @@ import java.util.UUID
 @Service
 class DeleteAccountService(
     private val userAccountRepository: UserAccountRepository,
+    private val userDeviceTokenRepository: UserDeviceTokenRepository,
     private val loginSessionRepository: LoginSessionRepository,
     private val eventRepository: EventRepository,
     private val eventAttendanceRepository: EventAttendanceRepository,
@@ -40,6 +42,7 @@ class DeleteAccountService(
 
         applyCalendarDataPolicy(user, leftData)
         deleteProfileImage(user, leftData)
+        userDeviceTokenRepository.deleteByUserId(user.id)
         loginSessionRepository.deleteByUserId(user.id)
         socialAccountRepository.deleteByUserId(user.id)
         if (leftData) {
