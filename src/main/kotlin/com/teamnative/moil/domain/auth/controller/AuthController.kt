@@ -123,8 +123,7 @@ class AuthController(
         )
     }
 
-    @GetMapping("/profile")
-    fun profile(
+    fun profileLegacy(
         @RequestHeader("Authorization", required = false) authorization: String?,
     ): ApiResponse<ProfileResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)
@@ -135,8 +134,7 @@ class AuthController(
         )
     }
 
-    @GetMapping("/profile")
-    fun profile(
+    fun profileBroken(
         @RequestHeader("Authorization", required = false) authorization: String?,
     ): ApiResponse<ProfileResponse> {
         val user = authenticatedUserService.getByAuthorizationHeader(authorization)

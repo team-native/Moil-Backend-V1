@@ -15,13 +15,6 @@ class ProfileService(
     private val imageService: ImageService,
 ) {
 
-    @Transactional(readOnly = true)
-    fun get(user: UserAccount): ProfileResponse = ProfileResponse(
-        userId = user.id,
-        name = user.name,
-        email = user.email,
-    )
-
     @Transactional
     fun update(user: UserAccount, name: String, colorId: String? = null, imagePath: String? = null): ProfileResponse {
         val selection = if (colorId != null || imagePath != null) {
