@@ -12,6 +12,14 @@ data class AppLinkProperties(
     fun groupJoinUri(groupId: Long): String =
         groupJoinTemplate.replace("{groupId}", groupId.toString())
 
+    fun groupJoinUri(groupId: Long, inviteCode: String): String =
+        UriComponentsBuilder
+            .fromUriString(groupJoinUri(groupId))
+            .queryParam("code", inviteCode)
+            .build()
+            .encode()
+            .toUriString()
+
     fun oauthCallbackUri(provider: String, code: String, user: String? = null, state: String? = null): String {
         val builder = UriComponentsBuilder
             .fromUriString(oauthCallbackTemplate.replace("{provider}", provider))
