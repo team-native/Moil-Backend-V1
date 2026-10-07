@@ -75,4 +75,27 @@ class DeviceTokenApiTest : IntegrationTestSupport() {
 
         assertTrue(userDeviceTokenRepository.findByToken(token) == null)
     }
+
+    @Test
+    fun `device token endpoints require the bearer token`() {
+        mockMvc.perform(
+            put("/users/me/device-token")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"token":"apns-token-unauthorized","platform":"IOS"}"""),
+        )
+            .andExpect(status().isUnauthorized)
+    }
+
+    @Test
+    fun `device token registration rejects unsupported platform`() {
+        val session = createLoginSession(password = "password")
+
+        mockMvc.perform(
+            put("/users/me/device-token")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer ${session.accessToken}")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""{"token":"device-token-invalid-platform","platform":"WEB"}"""),
+        )
+            .andExpect(status().isBadRequest)
+    }
 }
