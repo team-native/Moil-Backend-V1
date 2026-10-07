@@ -123,6 +123,18 @@ class AuthController(
         )
     }
 
+    @GetMapping("/profile")
+    fun profile(
+        @RequestHeader("Authorization", required = false) authorization: String?,
+    ): ApiResponse<ProfileResponse> {
+        val user = authenticatedUserService.getByAuthorizationHeader(authorization)
+
+        return ApiResponse.success(
+            message = "프로필을 조회했습니다.",
+            data = profileService.get(user),
+        )
+    }
+
     @PostMapping("/logout")
     fun logout(
         @RequestHeader("Authorization", required = false) authorization: String?,
