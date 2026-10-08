@@ -9,5 +9,6 @@ import org.springframework.context.annotation.Configuration
     JwtProperties::class,
     OauthProperties::class,
     SmtpProperties::class,
+    ApnsProperties::class,
 )
 class PropertiesConfig

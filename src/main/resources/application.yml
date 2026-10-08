@@ -35,6 +35,13 @@ moil:
     from: ${SMTP_FROM:}
   app-link:
     group-join-template: ${GROUP_JOIN_APP_LINK_TEMPLATE:moil://join/{groupId}}
+  apns:
+    enabled: ${APNS_ENABLED:false}
+    team-id: ${APNS_TEAM_ID:}
+    key-id: ${APNS_KEY_ID:}
+    private-key: ${APNS_PRIVATE_KEY:}
+    bundle-id: ${APNS_BUNDLE_ID:com.teamnative.Moil}
+    environment: ${APNS_ENVIRONMENT:sandbox}
   oauth:
     google:
       client-id: ${GOOGLE_CLIENT_ID:}

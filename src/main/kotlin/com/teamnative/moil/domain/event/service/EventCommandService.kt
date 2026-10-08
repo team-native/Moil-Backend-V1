@@ -12,6 +12,7 @@ import com.teamnative.moil.domain.event.repository.EventSharedMemberRepository
 import com.teamnative.moil.domain.group.repository.GroupMemberRepository
 import com.teamnative.moil.domain.group.service.GroupPermissionService
 import org.springframework.http.HttpStatus
+import org.springframework.context.ApplicationEventPublisher
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
@@ -30,6 +31,7 @@ class EventCommandService(
     private val groupMemberRepository: GroupMemberRepository,
     private val eventSharedMemberRepository: EventSharedMemberRepository,
     private val eventAttendanceRepository: EventAttendanceRepository,
+    private val applicationEventPublisher: ApplicationEventPublisher,
 ) {
 
     @Transactional
@@ -54,6 +56,7 @@ class EventCommandService(
             endsAt = range.second.toString(),
         )
         replaceSharedMembers(eventId, groupId, sharedMemberIds)
+        applicationEventPublisher.publishEvent(EventCreatedNotification(user.id, groupId, eventId, title))
 
         return eventId
     }
@@ -119,6 +122,7 @@ class EventCommandService(
             endsAt = range.second.toString(),
         )
         replaceSharedMembers(eventId, event.groupId, sharedMemberIds)
+        applicationEventPublisher.publishEvent(EventUpdatedNotification(user.id, event.groupId, eventId, title))
     }
 
     @Transactional
@@ -185,6 +189,9 @@ class EventCommandService(
         eventAttendanceRepository.save(
             current?.copy(status = status, updatedAt = updatedAt)
                 ?: EventAttendance(eventId = eventId, userId = user.id, status = status, updatedAt = updatedAt),
+        )
+        applicationEventPublisher.publishEvent(
+            AttendanceUpdatedNotification(user.id, event.groupId, event.id, event.creatorId, event.title, status),
         )
 
         return EventAttendanceResponse(status = status, updatedAt = updatedAt)
