@@ -8,6 +8,8 @@ import org.springframework.stereotype.Repository
 interface UserDeviceTokenRepository : JpaRepository<UserDeviceToken, Long> {
     fun findByToken(token: String): UserDeviceToken?
 
+    fun findAllByUserIdIn(userIds: Collection<Long>): List<UserDeviceToken>
+
     fun deleteByUserIdAndToken(userId: Long, token: String)
 
     fun deleteByUserId(userId: Long)
