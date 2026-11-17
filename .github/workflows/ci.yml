@@ -21,8 +21,8 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v5
         with:
-          distribution: temurin
-          java-version: "21"
+          distribution: zulu
+          java-version: "21.0.13"
           cache: gradle
 
       - name: Make Gradle wrapper executable

@@ -2,7 +2,7 @@
 
 ## 요구사항
 
-- Java 21
+- Azul Zulu JDK 21.0.13.0.2 or later (patched for CVE-2026-91403)
 - Git
 - MySQL 8 이상
 
